@@ -88,6 +88,7 @@ func TestGetMetricData(t *testing.T) {
 }
 
 func TestCheckFunction(t *testing.T) {
+	plugin.MaxPages = 1
 	cases := []struct {
 		client             mockService
 		tags               []string

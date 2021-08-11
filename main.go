@@ -255,7 +255,8 @@ func checkFunction(client ServiceAPI) (int, error) {
 
 	}
 	if numPages > plugin.MaxPages {
-		fmt.Println("# Warning: max allowed ListMetrics result pages exceeded, either filter via --namespace or --metric option or increase --max-pages value")
+		fmt.Printf("# Warning: max allowed ListMetrics result pages (%v) exceeded, either filter via --namespace or --metric option or increase --max-pages value",
+			plugin.MaxPages)
 		return sensu.CheckStateWarning, nil
 	}
 	return sensu.CheckStateOK, nil
