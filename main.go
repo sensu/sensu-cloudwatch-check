@@ -3,10 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 
-	// FIXME: Replace s3 with the correct aws service subpackage from aws-sdk-go-v2
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	v2 "github.com/sensu/sensu-go/api/core/v2"
 	"github.com/sensu/sensu-plugin-sdk/aws"
 	"github.com/sensu/sensu-plugin-sdk/sensu"
@@ -20,6 +19,7 @@ type Config struct {
 	aws.AWSPluginConfig
 	//Additional configs for this check command
 	Example string
+	Verbose bool
 }
 
 var (
@@ -42,6 +42,14 @@ var (
 			Usage:     "An example string configuration option",
 			Value:     &plugin.Example,
 		},
+		&sensu.PluginConfigOption{
+			Path:      "verbose",
+			Argument:  "verbose",
+			Shorthand: "v",
+			Default:   false,
+			Usage:     "Enable verbose output",
+			Value:     &plugin.Verbose,
+		},
 	}
 )
 
@@ -57,11 +65,18 @@ func main() {
 
 func checkArgs(event *v2.Event) (int, error) {
 	// Check for valid AWS credentials
+	if plugin.Verbose {
+		fmt.Println("  Checking AWS Creds")
+	}
 	if state, err := plugin.CheckAWSCreds(); err != nil {
 		return state, err
 	}
 
 	// Specific Argument Checking for this command
+	if plugin.Verbose {
+		fmt.Println("Checking Arguments")
+	}
+
 	if len(plugin.Example) == 0 {
 		return sensu.CheckStateWarning, fmt.Errorf("--example or CHECK_EXAMPLE environment variable is required")
 	}
@@ -74,8 +89,7 @@ func executeCheck(event *v2.Event) (int, error) {
 		return sensu.CheckStateCritical, fmt.Errorf("AWS Config undefined, something went wrong in processing AWS configuration information")
 	}
 	//Start AWS Service specific client
-	// FIXME: replace s3 with correct service from AWS SDK
-	client := s3.NewFromConfig(*plugin.AWSConfig)
+	client := cloudwatch.NewFromConfig(*plugin.AWSConfig)
 	//Run business logic for check
 	state, err := checkFunction(client)
 	return state, err
@@ -84,30 +98,42 @@ func executeCheck(event *v2.Event) (int, error) {
 //Create service interface to help with mock testing
 // FIXME: replace s3 functions with correct service functions from AWS SDK
 type ServiceAPI interface {
-	ListBuckets(ctx context.Context, params *s3.ListBucketsInput, optFns ...func(*s3.Options)) (*s3.ListBucketsOutput, error)
-	GetBucketTagging(ctx context.Context, params *s3.GetBucketTaggingInput, optFns ...func(*s3.Options)) (*s3.GetBucketTaggingOutput, error)
+	ListMetrics(ctx context.Context,
+		params *cloudwatch.ListMetricsInput,
+		optFns ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error)
+}
+
+func GetMetrics(c context.Context, api ServiceAPI, input *cloudwatch.ListMetricsInput) (*cloudwatch.ListMetricsOutput, error) {
+	return api.ListMetrics(c, input)
 }
 
 // Note: Use ServiceAPI interface definition to make function testable with mock API testing pattern
 // FIXME: replace s3 with correct service from AWS SDK
 func checkFunction(client ServiceAPI) (int, error) {
-	inputs := &s3.ListBucketsInput{}
-	output, err := client.ListBuckets(context.Background(), inputs)
-	if err != nil {
-		return sensu.CheckStateCritical, err
-	}
-	if output != nil && output.Buckets != nil && len(output.Buckets) > 0 {
-		for _, bucket := range output.Buckets {
-			bucketInput := &s3.GetBucketTaggingInput{Bucket: bucket.Name}
-			bucketOutput, err := client.GetBucketTagging(context.Background(), bucketInput)
-			if err != nil {
-				continue
-			}
-			if bucketOutput == nil {
-				continue
-			}
+	input := &cloudwatch.ListMetricsInput{}
+	result, err := GetMetrics(context.TODO(), client, input)
 
-		}
+	if err != nil {
+		fmt.Println("Could not get metrics")
+		return sensu.CheckStateCritical, nil
 	}
+
+	fmt.Println("Metrics:")
+	numMetrics := 0
+
+	for _, m := range result.Metrics {
+		fmt.Println("   Metric Name: " + *m.MetricName)
+		fmt.Println("   Namespace:   " + *m.Namespace)
+		fmt.Println("   Dimensions:")
+		for _, d := range m.Dimensions {
+			fmt.Println("      " + *d.Name + ": " + *d.Value)
+		}
+
+		fmt.Println("")
+		numMetrics++
+	}
+
+	fmt.Println("Found " + strconv.Itoa(numMetrics) + " metrics")
+
 	return sensu.CheckStateOK, nil
 }
