@@ -21,10 +21,13 @@ type Config struct {
 	//AWS specific Sensu plugin configs
 	sensuAWS.AWSPluginConfig
 	//Additional configs for this check command
-	Namespace      string
-	MetricName     string
-	Verbose        bool
-	RecentlyActive bool
+	Namespace       string
+	MetricName      string
+	Verbose         bool
+	RecentlyActive  bool
+	MaxPages        int
+	DurationMinutes int
+	PeriodSeconds   int
 }
 
 var (
@@ -38,14 +41,6 @@ var (
 	}
 	//initialize options list with custom options
 	options = []*sensu.PluginConfigOption{
-		&sensu.PluginConfigOption{
-			Path:      "verbose",
-			Argument:  "verbose",
-			Shorthand: "v",
-			Default:   false,
-			Usage:     "Enable verbose output",
-			Value:     &plugin.Verbose,
-		},
 		&sensu.PluginConfigOption{
 			Path:     "recently-active",
 			Argument: "recently-active",
@@ -68,6 +63,38 @@ var (
 			Default:   "",
 			Usage:     "Cloudwatch Metric Name",
 			Value:     &plugin.MetricName,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "max-pages",
+			Argument:  "max-pages",
+			Shorthand: "m",
+			Default:   1,
+			Usage:     "Maximum number of result pages",
+			Value:     &plugin.MaxPages,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "duration-minutes",
+			Argument:  "duration-minutes",
+			Shorthand: "d",
+			Default:   10,
+			Usage:     "Duration in minutes for metrics statistic calculation",
+			Value:     &plugin.DurationMinutes,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "period-seconds",
+			Argument:  "period-seconds",
+			Shorthand: "p",
+			Default:   60,
+			Usage:     "Duration in minutes for metrics statistic calculation",
+			Value:     &plugin.PeriodSeconds,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "verbose",
+			Argument:  "verbose",
+			Shorthand: "v",
+			Default:   false,
+			Usage:     "Enable verbose output",
+			Value:     &plugin.Verbose,
 		},
 	}
 )
@@ -146,19 +173,17 @@ func buildListMetricsInput() (*cloudwatch.ListMetricsInput, error) {
 	return input, nil
 }
 func buildGetMetricDataInput(m types.Metric) (*cloudwatch.GetMetricDataInput, error) {
-	diffInMinutes := 10
 	stat := "Average"
-	period := 60
 	id := "hmm"
 	input := &cloudwatch.GetMetricDataInput{}
 	input.EndTime = aws.Time(time.Unix(time.Now().Unix(), 0))
-	input.StartTime = aws.Time(time.Unix(time.Now().Add(time.Duration(-diffInMinutes)*time.Minute).Unix(), 0))
+	input.StartTime = aws.Time(time.Unix(time.Now().Add(time.Duration(-plugin.DurationMinutes)*time.Minute).Unix(), 0))
 	input.MetricDataQueries = []types.MetricDataQuery{
 		types.MetricDataQuery{
 			Id: aws.String(id),
 			MetricStat: &types.MetricStat{
 				Metric: &m,
-				Period: aws.Int32(int32(period)),
+				Period: aws.Int32(int32(plugin.PeriodSeconds)),
 				Stat:   aws.String(stat),
 			},
 		},
@@ -172,7 +197,7 @@ func checkFunction(client ServiceAPI) (int, error) {
 	if plugin.Verbose {
 		fmt.Println("Metrics:")
 	}
-	for getList := true; getList && numPages < 100; {
+	for getList := true; getList && numPages < plugin.MaxPages; {
 		getList = false
 		input, err := buildListMetricsInput()
 		if err != nil {
@@ -222,11 +247,16 @@ func checkFunction(client ServiceAPI) (int, error) {
 		}
 
 	}
+	numPages++
 	if plugin.Verbose {
 		fmt.Println("Found " + strconv.Itoa(numMetrics) + " metrics")
 		fmt.Println("Result Pages " + strconv.Itoa(numPages))
 		fmt.Println("")
 
+	}
+	if numPages > plugin.MaxPages {
+		fmt.Println("# Warning: max allowed ListMetrics result pages exceeded, either filter via --namespace or --metric option or increase --max-pages value")
+		return sensu.CheckStateWarning, nil
 	}
 	return sensu.CheckStateOK, nil
 }
