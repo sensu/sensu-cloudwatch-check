@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	v2 "github.com/sensu/sensu-go/api/core/v2"
-	"github.com/sensu/sensu-plugin-sdk/aws"
+	sensuAWS "github.com/sensu/sensu-plugin-sdk/aws"
 	"github.com/sensu/sensu-plugin-sdk/sensu"
 )
 
@@ -16,10 +19,12 @@ type Config struct {
 	//Base Sensu plugin configs
 	sensu.PluginConfig
 	//AWS specific Sensu plugin configs
-	aws.AWSPluginConfig
+	sensuAWS.AWSPluginConfig
 	//Additional configs for this check command
-	Example string
-	Verbose bool
+	Namespace      string
+	MetricName     string
+	Verbose        bool
+	RecentlyActive bool
 }
 
 var (
@@ -34,21 +39,35 @@ var (
 	//initialize options list with custom options
 	options = []*sensu.PluginConfigOption{
 		&sensu.PluginConfigOption{
-			Path:      "example",
-			Env:       "CHECK_EXAMPLE",
-			Argument:  "example",
-			Shorthand: "e",
-			Default:   "",
-			Usage:     "An example string configuration option",
-			Value:     &plugin.Example,
-		},
-		&sensu.PluginConfigOption{
 			Path:      "verbose",
 			Argument:  "verbose",
 			Shorthand: "v",
 			Default:   false,
 			Usage:     "Enable verbose output",
 			Value:     &plugin.Verbose,
+		},
+		&sensu.PluginConfigOption{
+			Path:     "recently-active",
+			Argument: "recently-active",
+			Default:  false,
+			Usage:    "Only include metrics recently active in aprox last 3 hours",
+			Value:    &plugin.RecentlyActive,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "namespace",
+			Argument:  "namespace",
+			Shorthand: "N",
+			Default:   "",
+			Usage:     "Cloudwatch Metric Namespace",
+			Value:     &plugin.Namespace,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "metric",
+			Argument:  "metric",
+			Shorthand: "M",
+			Default:   "",
+			Usage:     "Cloudwatch Metric Name",
+			Value:     &plugin.MetricName,
 		},
 	}
 )
@@ -66,7 +85,7 @@ func main() {
 func checkArgs(event *v2.Event) (int, error) {
 	// Check for valid AWS credentials
 	if plugin.Verbose {
-		fmt.Println("  Checking AWS Creds")
+		fmt.Println("Checking AWS Creds")
 	}
 	if state, err := plugin.CheckAWSCreds(); err != nil {
 		return state, err
@@ -77,9 +96,6 @@ func checkArgs(event *v2.Event) (int, error) {
 		fmt.Println("Checking Arguments")
 	}
 
-	if len(plugin.Example) == 0 {
-		return sensu.CheckStateWarning, fmt.Errorf("--example or CHECK_EXAMPLE environment variable is required")
-	}
 	return sensu.CheckStateOK, nil
 }
 
@@ -101,39 +117,116 @@ type ServiceAPI interface {
 	ListMetrics(ctx context.Context,
 		params *cloudwatch.ListMetricsInput,
 		optFns ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error)
+	GetMetricData(ctx context.Context,
+		params *cloudwatch.GetMetricDataInput,
+		optFns ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error)
 }
 
-func GetMetrics(c context.Context, api ServiceAPI, input *cloudwatch.ListMetricsInput) (*cloudwatch.ListMetricsOutput, error) {
+func GetMetricsList(c context.Context, api ServiceAPI, input *cloudwatch.ListMetricsInput) (*cloudwatch.ListMetricsOutput, error) {
 	return api.ListMetrics(c, input)
+}
+
+func GetMetricData(c context.Context, api ServiceAPI, input *cloudwatch.GetMetricDataInput) (*cloudwatch.GetMetricDataOutput, error) {
+	return api.GetMetricData(c, input)
 }
 
 // Note: Use ServiceAPI interface definition to make function testable with mock API testing pattern
 // FIXME: replace s3 with correct service from AWS SDK
-func checkFunction(client ServiceAPI) (int, error) {
+func buildListMetricsInput() (*cloudwatch.ListMetricsInput, error) {
 	input := &cloudwatch.ListMetricsInput{}
-	result, err := GetMetrics(context.TODO(), client, input)
-
-	if err != nil {
-		fmt.Println("Could not get metrics")
-		return sensu.CheckStateCritical, nil
+	if plugin.RecentlyActive {
+		input.RecentlyActive = "PT3H"
 	}
+	if len(plugin.Namespace) > 0 {
+		input.Namespace = &plugin.Namespace
+	}
+	if len(plugin.MetricName) > 0 {
+		input.MetricName = &plugin.MetricName
+	}
+	return input, nil
+}
+func buildGetMetricDataInput(m types.Metric) (*cloudwatch.GetMetricDataInput, error) {
+	diffInMinutes := 10
+	stat := "Average"
+	period := 60
+	id := "hmm"
+	input := &cloudwatch.GetMetricDataInput{}
+	input.EndTime = aws.Time(time.Unix(time.Now().Unix(), 0))
+	input.StartTime = aws.Time(time.Unix(time.Now().Add(time.Duration(-diffInMinutes)*time.Minute).Unix(), 0))
+	input.MetricDataQueries = []types.MetricDataQuery{
+		types.MetricDataQuery{
+			Id: aws.String(id),
+			MetricStat: &types.MetricStat{
+				Metric: &m,
+				Period: aws.Int32(int32(period)),
+				Stat:   aws.String(stat),
+			},
+		},
+	}
+	return input, nil
+}
 
-	fmt.Println("Metrics:")
+func checkFunction(client ServiceAPI) (int, error) {
 	numMetrics := 0
+	numPages := 0
+	if plugin.Verbose {
+		fmt.Println("Metrics:")
+	}
+	for getList := true; getList && numPages < 100; {
+		getList = false
+		input, err := buildListMetricsInput()
+		if err != nil {
+			fmt.Println("Could not create ListMetricsInput")
+			return sensu.CheckStateCritical, nil
+		}
+		listResult, err := GetMetricsList(context.TODO(), client, input)
 
-	for _, m := range result.Metrics {
-		fmt.Println("   Metric Name: " + *m.MetricName)
-		fmt.Println("   Namespace:   " + *m.Namespace)
-		fmt.Println("   Dimensions:")
-		for _, d := range m.Dimensions {
-			fmt.Println("      " + *d.Name + ": " + *d.Value)
+		if err != nil {
+			fmt.Println("Could not get metrics list")
+			return sensu.CheckStateCritical, nil
+		}
+		if listResult.NextToken != nil {
+			getList = true
+			numPages++
+			input.NextToken = listResult.NextToken
+		}
+		for _, m := range listResult.Metrics {
+			if plugin.Verbose {
+				fmt.Println("   Metric Name: " + *m.MetricName)
+				fmt.Println("   Namespace:   " + *m.Namespace)
+				fmt.Println("   Dimensions:")
+				for _, d := range m.Dimensions {
+					fmt.Println("      " + *d.Name + ": " + *d.Value)
+				}
+
+			}
+			numMetrics++
+
+			getMetricDataInput, err := buildGetMetricDataInput(m)
+			if err != nil {
+				fmt.Println("Could not build GetMetricsDataInput")
+				return sensu.CheckStateCritical, nil
+			}
+			dataResult, err := GetMetricData(context.TODO(), client, getMetricDataInput)
+			if err != nil {
+				fmt.Println("Could not get metrics")
+				return sensu.CheckStateCritical, nil
+			}
+			if plugin.Verbose {
+				fmt.Printf("   NextToken: %+v\n", dataResult.NextToken)
+				fmt.Printf("   Messages: %+v\n", dataResult.Messages)
+				fmt.Printf("   Data: %+v\n", dataResult.MetricDataResults)
+				fmt.Println("")
+			}
+
 		}
 
-		fmt.Println("")
-		numMetrics++
 	}
+	if plugin.Verbose {
+		fmt.Println("Found " + strconv.Itoa(numMetrics) + " metrics")
+		fmt.Println("Result Pages " + strconv.Itoa(numPages))
+		fmt.Println("")
 
-	fmt.Println("Found " + strconv.Itoa(numMetrics) + " metrics")
-
+	}
 	return sensu.CheckStateOK, nil
 }

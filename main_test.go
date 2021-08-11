@@ -37,7 +37,7 @@ func (m mockService) ListMetrics(ctx context.Context,
 
 func (m mockService) GetMetricData(ctx context.Context,
 	params *cloudwatch.GetMetricDataInput,
-	optFns ...func(cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	optFns ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
 	name := "test"
 	namespace := "AWS/test"
 	// Create a list of two dummy metrics
