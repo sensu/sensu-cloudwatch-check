@@ -177,7 +177,7 @@ func buildGetMetricDataInput(m types.Metric) (*cloudwatch.GetMetricDataInput, er
 	metricDataQueries := []types.MetricDataQuery{}
 	s := strings.Split(*m.Namespace, "/")
 
-	for _, stat := range []string{"Average", "Maximum", "Minimum", "Sum"} {
+	for _, stat := range []string{"SampleCount", "Average", "Maximum", "Minimum", "Sum"} {
 		idString := strings.ToLower(fmt.Sprintf("%v_%v_%v_%v", s[0], s[1], *m.MetricName, stat))
 		labelString := strings.ToLower(fmt.Sprintf("%v.%v.%v.%v", s[0], s[1], *m.MetricName, stat))
 		dataQuery := types.MetricDataQuery{
