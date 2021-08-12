@@ -4,15 +4,22 @@ import (
 	"context"
 	"strconv"
 	"testing"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 )
 
 // Create mockService Object to use in testing.
 // FIXME: replace s3 specific items with correct AWS service items
+var (
+	nextToken = false
+)
+
 type mockService struct {
-	statusCode types.StatusCode
+	statusCode      types.StatusCode
+	includeMessages bool
 }
 
 // Create mockService Functions that match functions defined in ServiceAPI interface in main.go
@@ -26,12 +33,21 @@ func (m mockService) ListMetrics(ctx context.Context,
 		types.Metric{
 			MetricName: &name,
 			Namespace:  &namespace,
+			Dimensions: []types.Dimension{
+				types.Dimension{
+					Name:  aws.String("test_name"),
+					Value: aws.String("test_value"),
+				},
+			},
 		},
 	}
 	output := &cloudwatch.ListMetricsOutput{
 		Metrics: metrics,
 	}
-
+	if nextToken {
+		output.NextToken = aws.String("yes")
+		nextToken = false
+	}
 	return output, nil
 }
 
@@ -46,12 +62,25 @@ func (m mockService) GetMetricData(ctx context.Context,
 			Id:         &name,
 			Label:      &namespace,
 			StatusCode: m.statusCode,
+			Timestamps: []time.Time{
+				time.Now(),
+			},
+			Values: []float64{
+				0.0,
+			},
 		},
 	}
 	output := &cloudwatch.GetMetricDataOutput{
 		MetricDataResults: results,
 	}
-
+	if m.includeMessages {
+		output.Messages = []types.MessageData{
+			types.MessageData{
+				Code:  aws.String("400"),
+				Value: aws.String("test message"),
+			},
+		}
+	}
 	return output, nil
 }
 
@@ -87,28 +116,60 @@ func TestGetMetricData(t *testing.T) {
 	}
 }
 
+func TestCheckArgs(t *testing.T) {
+	plugin.Verbose = true
+	t.Run("CheckArgs", func(t *testing.T) {
+		state, err := checkArgs(nil)
+		if err != nil {
+			t.Fatalf("expect no error, got %v", err)
+		}
+		if state != 0 {
+			t.Errorf("expect state: %v, got %v", 0, state)
+		}
+	})
+}
+
 func TestCheckFunction(t *testing.T) {
-	plugin.MaxPages = 1
+	plugin.RecentlyActive = true
+	plugin.MetricName = "test"
+	plugin.Namespace = "test"
+	plugin.Verbose = true
 	cases := []struct {
-		client             mockService
-		tags               []string
-		expectedState      int
-		expectedStatusCode types.StatusCode
+		client          mockService
+		expectedState   int
+		nextToken       bool
+		maxPages        int
+		includeMessages bool
 	}{ //start of array
 		{ //start of struct
-			client:             mockService{},
-			expectedState:      0,
-			expectedStatusCode: "Complete",
-			tags: []string{
-				"test_key",
-			},
+			client:          mockService{},
+			maxPages:        2,
+			nextToken:       true,
+			expectedState:   0,
+			includeMessages: false,
+		},
+		{ //start of struct
+			client:          mockService{},
+			maxPages:        1,
+			nextToken:       true,
+			expectedState:   1,
+			includeMessages: false,
+		},
+		{ //start of struct
+			client:          mockService{},
+			maxPages:        2,
+			nextToken:       true,
+			expectedState:   1,
+			includeMessages: true,
 		},
 	}
 	for i, tt := range cases {
-		t.Run(strconv.Itoa(i), func(t *testing.T) {
+		t.Run("CheckFunction Run: "+strconv.Itoa(i), func(t *testing.T) {
 			client := tt.client
+			client.includeMessages = tt.includeMessages
+			nextToken = tt.nextToken
+			plugin.MaxPages = tt.maxPages
 			state, err := checkFunction(client)
-			client.statusCode = tt.expectedStatusCode
 			if err != nil {
 				t.Fatalf("expect no error, got %v", err)
 			}
