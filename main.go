@@ -226,6 +226,11 @@ func checkFunction(client ServiceAPI) (int, error) {
 			input.NextToken = listResult.NextToken
 		}
 		for _, m := range listResult.Metrics {
+			dimStrings := []string{}
+			for _, d := range m.Dimensions {
+				dimStrings = append(dimStrings, fmt.Sprintf(`%v="%v"`, *d.Name, *d.Value))
+			}
+			dimString := strings.Join(dimStrings, ",")
 			if plugin.Verbose {
 				fmt.Println("   Metric Name: " + *m.MetricName)
 				fmt.Println("   Namespace:   " + *m.Namespace)
@@ -248,7 +253,13 @@ func checkFunction(client ServiceAPI) (int, error) {
 				return sensu.CheckStateCritical, nil
 			}
 			for _, d := range dataResult.MetricDataResults {
-				outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v %v %v ", *d.Label, *m.Namespace, *m.MetricName))
+				if len(d.Timestamps) > 0 {
+					outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", *d.Label, *m.Namespace, *m.MetricName, dimString))
+					for i := range d.Timestamps {
+						outputStrings = append(outputStrings, fmt.Sprintf("%v{%v} %v %v", *d.Label, dimString, d.Values[i], d.Timestamps[i].Unix()))
+					}
+					outputStrings = append(outputStrings, "")
+				}
 			}
 			if plugin.Verbose {
 				fmt.Printf("   NextToken: %+v\n", dataResult.NextToken)
