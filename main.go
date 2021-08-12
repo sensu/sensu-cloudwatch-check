@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -173,27 +174,36 @@ func buildListMetricsInput() (*cloudwatch.ListMetricsInput, error) {
 	return input, nil
 }
 func buildGetMetricDataInput(m types.Metric) (*cloudwatch.GetMetricDataInput, error) {
-	stat := "Average"
-	id := "hmm"
-	input := &cloudwatch.GetMetricDataInput{}
-	input.EndTime = aws.Time(time.Unix(time.Now().Unix(), 0))
-	input.StartTime = aws.Time(time.Unix(time.Now().Add(time.Duration(-plugin.DurationMinutes)*time.Minute).Unix(), 0))
-	input.MetricDataQueries = []types.MetricDataQuery{
-		types.MetricDataQuery{
-			Id: aws.String(id),
+	metricDataQueries := []types.MetricDataQuery{}
+	s := strings.Split(*m.Namespace, "/")
+
+	for _, stat := range []string{"Average", "Maximum", "Minimum", "Sum"} {
+		idString := strings.ToLower(fmt.Sprintf("%v_%v_%v_%v", s[0], s[1], *m.MetricName, stat))
+		labelString := strings.ToLower(fmt.Sprintf("%v.%v.%v.%v", s[0], s[1], *m.MetricName, stat))
+		dataQuery := types.MetricDataQuery{
+			Id:    &idString,
+			Label: &labelString,
 			MetricStat: &types.MetricStat{
 				Metric: &m,
 				Period: aws.Int32(int32(plugin.PeriodSeconds)),
 				Stat:   aws.String(stat),
 			},
-		},
+		}
+		metricDataQueries = append(metricDataQueries, dataQuery)
 	}
+	input := &cloudwatch.GetMetricDataInput{}
+	input.EndTime = aws.Time(time.Unix(time.Now().Unix(), 0))
+	input.StartTime = aws.Time(time.Unix(time.Now().Add(time.Duration(-plugin.DurationMinutes)*time.Minute).Unix(), 0))
+	input.MetricDataQueries = metricDataQueries
 	return input, nil
 }
 
 func checkFunction(client ServiceAPI) (int, error) {
 	numMetrics := 0
 	numPages := 0
+	dataMessages := []types.MessageData{}
+	outputStrings := []string{}
+
 	if plugin.Verbose {
 		fmt.Println("Metrics:")
 	}
@@ -234,16 +244,28 @@ func checkFunction(client ServiceAPI) (int, error) {
 			}
 			dataResult, err := GetMetricData(context.TODO(), client, getMetricDataInput)
 			if err != nil {
-				fmt.Println("Could not get metrics")
+				fmt.Printf("Could not get metrics: %v\n", err)
 				return sensu.CheckStateCritical, nil
+			}
+			for _, d := range dataResult.MetricDataResults {
+				outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v %v %v ", *d.Label, *m.Namespace, *m.MetricName))
 			}
 			if plugin.Verbose {
 				fmt.Printf("   NextToken: %+v\n", dataResult.NextToken)
 				fmt.Printf("   Messages: %+v\n", dataResult.Messages)
-				fmt.Printf("   Data: %+v\n", dataResult.MetricDataResults)
+				fmt.Printf("   Data Results:\n")
+				for _, d := range dataResult.MetricDataResults {
+					fmt.Printf("     Id: %v\n", *d.Id)
+					fmt.Printf("     Label: %+v\n", *d.Label)
+					fmt.Printf("     StatusCode: %+v\n", d.StatusCode)
+					fmt.Printf("     Timestamps: %+v\n", d.Timestamps)
+					fmt.Printf("     Values: %+v\n", d.Values)
+				}
 				fmt.Println("")
 			}
-
+			if len(dataResult.Messages) > 0 {
+				dataMessages = append(dataMessages, dataResult.Messages...)
+			}
 		}
 
 	}
@@ -254,10 +276,24 @@ func checkFunction(client ServiceAPI) (int, error) {
 		fmt.Println("")
 
 	}
+	warnFlag := false
 	if numPages > plugin.MaxPages {
 		fmt.Printf("# Warning: max allowed ListMetrics result pages (%v) exceeded, either filter via --namespace or --metric option or increase --max-pages value",
 			plugin.MaxPages)
+		warnFlag = true
+	}
+	if len(dataMessages) > 0 {
+		fmt.Println("# Warning: Some calls to GetMetricData resulted in error messages")
+		for _, m := range dataMessages {
+			fmt.Printf("# GetMetricData:: Code: %v Message: %v\n", m.Code, m.Value)
+		}
+		warnFlag = true
+	}
+	if warnFlag {
 		return sensu.CheckStateWarning, nil
+	}
+	for _, s := range outputStrings {
+		fmt.Println(s)
 	}
 	return sensu.CheckStateOK, nil
 }
