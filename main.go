@@ -22,13 +22,13 @@ type Config struct {
 	//AWS specific Sensu plugin configs
 	sensuAWS.AWSPluginConfig
 	//Additional configs for this check command
-	Namespace       string
-	MetricName      string
-	Verbose         bool
-	RecentlyActive  bool
-	MaxPages        int
-	DurationMinutes int
-	PeriodSeconds   int
+	Namespace      string
+	MetricName     string
+	Verbose        bool
+	DryRun         bool
+	RecentlyActive bool
+	MaxPages       int
+	PeriodMinutes  int
 }
 
 var (
@@ -74,20 +74,12 @@ var (
 			Value:     &plugin.MaxPages,
 		},
 		&sensu.PluginConfigOption{
-			Path:      "duration-minutes",
-			Argument:  "duration-minutes",
-			Shorthand: "d",
-			Default:   10,
-			Usage:     "Duration in minutes for metrics statistic calculation",
-			Value:     &plugin.DurationMinutes,
-		},
-		&sensu.PluginConfigOption{
-			Path:      "period-seconds",
-			Argument:  "period-seconds",
+			Path:      "period-minutes",
+			Argument:  "period-minutes",
 			Shorthand: "p",
 			Default:   60,
-			Usage:     "Duration in minutes for metrics statistic calculation",
-			Value:     &plugin.PeriodSeconds,
+			Usage:     "Period in minutes for metrics statistic calculation",
+			Value:     &plugin.PeriodMinutes,
 		},
 		&sensu.PluginConfigOption{
 			Path:      "verbose",
@@ -96,6 +88,14 @@ var (
 			Default:   false,
 			Usage:     "Enable verbose output",
 			Value:     &plugin.Verbose,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "dry-run",
+			Argument:  "dry-run",
+			Shorthand: "n",
+			Default:   false,
+			Usage:     "Dryrun only list metrics, do not get metrics data",
+			Value:     &plugin.DryRun,
 		},
 	}
 )
@@ -123,7 +123,9 @@ func checkArgs(event *v2.Event) (int, error) {
 	if plugin.Verbose {
 		fmt.Println("Checking Arguments")
 	}
-
+	if len(plugin.Namespace) == 0 {
+		plugin.DryRun = true
+	}
 	return sensu.CheckStateOK, nil
 }
 
@@ -173,19 +175,26 @@ func buildListMetricsInput() (*cloudwatch.ListMetricsInput, error) {
 	}
 	return input, nil
 }
+
+func buildLabelBase(m types.Metric) string {
+	s := strings.Split(*m.Namespace, "/")
+	labelString := strings.ToLower(fmt.Sprintf("%v.%v.%v", s[0], s[1], *m.MetricName))
+	return labelString
+}
+
 func buildGetMetricDataInput(m types.Metric) (*cloudwatch.GetMetricDataInput, error) {
 	metricDataQueries := []types.MetricDataQuery{}
 	s := strings.Split(*m.Namespace, "/")
 
 	for _, stat := range []string{"SampleCount", "Average", "Maximum", "Minimum", "Sum"} {
 		idString := strings.ToLower(fmt.Sprintf("%v_%v_%v_%v", s[0], s[1], *m.MetricName, stat))
-		labelString := strings.ToLower(fmt.Sprintf("%v.%v.%v.%v", s[0], s[1], *m.MetricName, stat))
+		labelString := strings.ToLower(fmt.Sprintf("%v.%v", buildLabelBase(m), stat))
 		dataQuery := types.MetricDataQuery{
 			Id:    &idString,
 			Label: &labelString,
 			MetricStat: &types.MetricStat{
 				Metric: &m,
-				Period: aws.Int32(int32(plugin.PeriodSeconds)),
+				Period: aws.Int32(60 * int32(plugin.PeriodMinutes)),
 				Stat:   aws.String(stat),
 			},
 		}
@@ -193,7 +202,7 @@ func buildGetMetricDataInput(m types.Metric) (*cloudwatch.GetMetricDataInput, er
 	}
 	input := &cloudwatch.GetMetricDataInput{}
 	input.EndTime = aws.Time(time.Unix(time.Now().Unix(), 0))
-	input.StartTime = aws.Time(time.Unix(time.Now().Add(time.Duration(-plugin.DurationMinutes)*time.Minute).Unix(), 0))
+	input.StartTime = aws.Time(time.Unix(time.Now().Add(time.Duration(-plugin.PeriodMinutes)*time.Minute).Unix(), 0))
 	input.MetricDataQueries = metricDataQueries
 	return input, nil
 }
@@ -247,36 +256,41 @@ func checkFunction(client ServiceAPI) (int, error) {
 				fmt.Println("Could not build GetMetricsDataInput")
 				return sensu.CheckStateCritical, nil
 			}
-			dataResult, err := GetMetricData(context.TODO(), client, getMetricDataInput)
-			if err != nil {
-				fmt.Printf("Could not get metrics: %v\n", err)
-				return sensu.CheckStateCritical, nil
-			}
-			for _, d := range dataResult.MetricDataResults {
-				if len(d.Timestamps) > 0 {
-					outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", *d.Label, *m.Namespace, *m.MetricName, dimString))
-					for i := range d.Timestamps {
-						outputStrings = append(outputStrings, fmt.Sprintf("%v{%v} %v %v", *d.Label, dimString, d.Values[i], d.Timestamps[i].Unix()))
-					}
-					outputStrings = append(outputStrings, "")
+			if plugin.DryRun {
+				outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", buildLabelBase(m), *m.Namespace, *m.MetricName, dimString))
+			} else {
+				dataResult, err := GetMetricData(context.TODO(), client, getMetricDataInput)
+				if err != nil {
+					fmt.Printf("Could not get metrics: %v\n", err)
+					return sensu.CheckStateCritical, nil
 				}
-			}
-			if plugin.Verbose {
-				fmt.Printf("   NextToken: %+v\n", dataResult.NextToken)
-				fmt.Printf("   Messages: %+v\n", dataResult.Messages)
-				fmt.Printf("   Data Results:\n")
 				for _, d := range dataResult.MetricDataResults {
-					fmt.Printf("     Id: %v\n", *d.Id)
-					fmt.Printf("     Label: %+v\n", *d.Label)
-					fmt.Printf("     StatusCode: %+v\n", d.StatusCode)
-					fmt.Printf("     Timestamps: %+v\n", d.Timestamps)
-					fmt.Printf("     Values: %+v\n", d.Values)
+					if len(d.Timestamps) > 0 {
+						outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", *d.Label, *m.Namespace, *m.MetricName, dimString))
+						for i := range d.Timestamps {
+							outputStrings = append(outputStrings, fmt.Sprintf("%v{%v} %v %v", *d.Label, dimString, d.Values[i], d.Timestamps[i].Unix()))
+						}
+						outputStrings = append(outputStrings, "")
+					}
 				}
-				fmt.Println("")
+				if plugin.Verbose {
+					fmt.Printf("   NextToken: %+v\n", dataResult.NextToken)
+					fmt.Printf("   Messages: %+v\n", dataResult.Messages)
+					fmt.Printf("   Data Results:\n")
+					for _, d := range dataResult.MetricDataResults {
+						fmt.Printf("     Id: %v\n", *d.Id)
+						fmt.Printf("     Label: %+v\n", *d.Label)
+						fmt.Printf("     StatusCode: %+v\n", d.StatusCode)
+						fmt.Printf("     Timestamps: %+v\n", d.Timestamps)
+						fmt.Printf("     Values: %+v\n", d.Values)
+					}
+					fmt.Println("")
+				}
+				if len(dataResult.Messages) > 0 {
+					dataMessages = append(dataMessages, dataResult.Messages...)
+				}
 			}
-			if len(dataResult.Messages) > 0 {
-				dataMessages = append(dataMessages, dataResult.Messages...)
-			}
+
 		}
 
 	}
