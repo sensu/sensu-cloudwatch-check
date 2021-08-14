@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -119,6 +120,15 @@ func main() {
 	check.Execute()
 }
 
+var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
+var matchAllCap = regexp.MustCompile("([a-z0-9])([A-Z])")
+
+func toSnakeCase(str string) string {
+	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
+	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
+	return strings.ToLower(snake)
+}
+
 func checkArgs(event *v2.Event) (int, error) {
 	// Check for valid AWS credentials
 	if plugin.Verbose {
@@ -188,7 +198,7 @@ func buildListMetricsInput() (*cloudwatch.ListMetricsInput, error) {
 
 func buildLabelBase(m types.Metric) string {
 	s := strings.Split(*m.Namespace, "/")
-	labelString := strings.ToLower(fmt.Sprintf("%v.%v.%v", s[0], s[1], *m.MetricName))
+	labelString := toSnakeCase(fmt.Sprintf("%v.%v.%v", toSnakeCase(s[0]), toSnakeCase(s[1]), toSnakeCase(*m.MetricName)))
 	return labelString
 }
 
@@ -197,8 +207,8 @@ func buildGetMetricDataInput(m types.Metric) (*cloudwatch.GetMetricDataInput, er
 	s := strings.Split(*m.Namespace, "/")
 
 	for _, stat := range []string{"SampleCount", "Average", "Maximum", "Minimum", "Sum"} {
-		idString := strings.ToLower(fmt.Sprintf("%v_%v_%v_%v", s[0], s[1], *m.MetricName, stat))
-		labelString := strings.ToLower(fmt.Sprintf("%v.%v", buildLabelBase(m), stat))
+		idString := fmt.Sprintf("%v_%v_%v_%v", toSnakeCase(s[0]), toSnakeCase(s[1]), toSnakeCase(*m.MetricName), toSnakeCase(stat))
+		labelString := fmt.Sprintf("%v.%v", buildLabelBase(m), toSnakeCase(stat))
 		dataQuery := types.MetricDataQuery{
 			Id:    &idString,
 			Label: &labelString,
