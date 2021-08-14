@@ -23,14 +23,16 @@ type Config struct {
 	//AWS specific Sensu plugin configs
 	sensuAWS.AWSPluginConfig
 	//Additional configs for this check command
-	Namespace      string
-	MetricName     string
-	ConfigString   string
-	Verbose        bool
-	DryRun         bool
-	RecentlyActive bool
-	MaxPages       int
-	PeriodMinutes  int
+	Namespace              string
+	MetricName             string
+	ConfigString           string
+	DimensionFilterStrings []string
+	DimensionFilters       []types.DimensionFilter
+	Verbose                bool
+	DryRun                 bool
+	RecentlyActive         bool
+	MaxPages               int
+	PeriodMinutes          int
 }
 
 var (
@@ -66,6 +68,14 @@ var (
 			Default:   "",
 			Usage:     "Cloudwatch Metric Namespace",
 			Value:     &plugin.Namespace,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "dimension-filter",
+			Argument:  "dimension-filter",
+			Shorthand: "D",
+			Default:   []string{},
+			Usage:     `Comma separated list of AWS Cloudwatch Dimension Filters Ex: "Name, SecondName=SecondValue"`,
+			Value:     &plugin.DimensionFilterStrings,
 		},
 		&sensu.PluginConfigOption{
 			Path:      "metric",
@@ -129,6 +139,22 @@ func toSnakeCase(str string) string {
 	return strings.ToLower(snake)
 }
 
+func buildDimensionFilters(input []string) ([]types.DimensionFilter, error) {
+	output := []types.DimensionFilter{}
+	for _, item := range input {
+		segments := strings.Split(strings.TrimSpace(item), "=")
+		if len(segments) < 1 || len(segments) > 2 {
+			return nil, fmt.Errorf("Error parsing dimension filters")
+		}
+		filter := types.DimensionFilter{Name: &segments[0]}
+		if len(segments) > 1 {
+			filter.Value = &segments[1]
+		}
+		output = append(output, filter)
+	}
+	return output, nil
+}
+
 func checkArgs(event *v2.Event) (int, error) {
 	// Check for valid AWS credentials
 	if plugin.Verbose {
@@ -141,6 +167,13 @@ func checkArgs(event *v2.Event) (int, error) {
 	// Specific Argument Checking for this command
 	if plugin.Verbose {
 		fmt.Println("Checking Arguments")
+	}
+	if len(plugin.DimensionFilterStrings) > 0 {
+		dimensionFilters, err := buildDimensionFilters(plugin.DimensionFilterStrings)
+		if err != nil {
+			return sensu.CheckStateWarning, err
+		}
+		plugin.DimensionFilters = dimensionFilters
 	}
 	// If haven't selected a cloudwatch filter argument switch to dryrun to avoid pulling data for all metrics
 	if len(plugin.Namespace) == 0 && len(plugin.MetricName) == 0 && !plugin.DryRun {
@@ -192,6 +225,9 @@ func buildListMetricsInput() (*cloudwatch.ListMetricsInput, error) {
 	}
 	if len(plugin.MetricName) > 0 {
 		input.MetricName = &plugin.MetricName
+	}
+	if len(plugin.DimensionFilters) > 0 {
+		input.Dimensions = plugin.DimensionFilters
 	}
 	return input, nil
 }
