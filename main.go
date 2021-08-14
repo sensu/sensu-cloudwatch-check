@@ -24,6 +24,7 @@ type Config struct {
 	//Additional configs for this check command
 	Namespace      string
 	MetricName     string
+	ConfigString   string
 	Verbose        bool
 	DryRun         bool
 	RecentlyActive bool
@@ -42,6 +43,14 @@ var (
 	}
 	//initialize options list with custom options
 	options = []*sensu.PluginConfigOption{
+		&sensu.PluginConfigOption{
+			Path:      "config",
+			Argument:  "config",
+			Shorthand: "c",
+			Default:   "",
+			Usage:     "Configuration JSON string",
+			Value:     &plugin.ConfigString,
+		},
 		&sensu.PluginConfigOption{
 			Path:     "recently-active",
 			Argument: "recently-active",
@@ -123,8 +132,9 @@ func checkArgs(event *v2.Event) (int, error) {
 	if plugin.Verbose {
 		fmt.Println("Checking Arguments")
 	}
-	if len(plugin.Namespace) == 0 {
-		plugin.DryRun = true
+	// If haven't selected a cloudwatch filter argument switch to dryrun to avoid pulling data for all metrics
+	if len(plugin.Namespace) == 0 && len(plugin.MetricName) == 0 && !plugin.DryRun {
+		return sensu.CheckStateWarning, fmt.Errorf("Must select at least one of: --namespace, --metric, or --dry-run")
 	}
 	return sensu.CheckStateOK, nil
 }

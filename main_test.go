@@ -85,6 +85,7 @@ func (m mockService) GetMetricData(ctx context.Context,
 }
 
 func TestGetMetricData(t *testing.T) {
+	cleanPluginValues()
 	cases := []struct {
 		client             mockService
 		expectedStatusCode types.StatusCode
@@ -114,10 +115,31 @@ func TestGetMetricData(t *testing.T) {
 		})
 
 	}
+	cleanPluginValues()
+}
+func cleanPluginValues() {
+	plugin.Verbose = false
+	plugin.RecentlyActive = false
+	plugin.DryRun = false
+	plugin.ConfigString = ""
+	plugin.MetricName = ""
+	plugin.Namespace = ""
+
 }
 
 func TestCheckArgs(t *testing.T) {
+	cleanPluginValues()
 	plugin.Verbose = true
+	t.Run("CheckArgs", func(t *testing.T) {
+		state, err := checkArgs(nil)
+		if err == nil {
+			t.Fatalf("expect error, got %v", err)
+		}
+		if state != 1 {
+			t.Errorf("expect state: %v, got %v", 1, state)
+		}
+	})
+	plugin.DryRun = true
 	t.Run("CheckArgs", func(t *testing.T) {
 		state, err := checkArgs(nil)
 		if err != nil {
@@ -127,9 +149,11 @@ func TestCheckArgs(t *testing.T) {
 			t.Errorf("expect state: %v, got %v", 0, state)
 		}
 	})
+	cleanPluginValues()
 }
 
 func TestCheckFunction(t *testing.T) {
+	cleanPluginValues()
 	plugin.RecentlyActive = true
 	plugin.MetricName = "test"
 	plugin.Namespace = "test"
@@ -171,7 +195,7 @@ func TestCheckFunction(t *testing.T) {
 			plugin.MaxPages = tt.maxPages
 			state, err := checkFunction(client)
 			if err != nil {
-				t.Fatalf("expect no error, got %v", err)
+				t.Fatalf("expect nil error, got %v", err)
 			}
 			if state != tt.expectedState {
 				t.Errorf("expect state: %v, got %v", tt.expectedState, state)
@@ -179,4 +203,5 @@ func TestCheckFunction(t *testing.T) {
 		})
 
 	}
+	cleanPluginValues()
 }
