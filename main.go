@@ -118,6 +118,9 @@ var (
 			Value:     &plugin.DryRun,
 		},
 	}
+	// Setup regexp for use with toSnakeCase
+	matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
+	matchAllCap   = regexp.MustCompile("([a-z0-9])([A-Z])")
 )
 
 func init() {
@@ -129,9 +132,6 @@ func main() {
 	check := sensu.NewGoCheck(&plugin.PluginConfig, options, checkArgs, executeCheck, false)
 	check.Execute()
 }
-
-var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
-var matchAllCap = regexp.MustCompile("([a-z0-9])([A-Z])")
 
 func toSnakeCase(str string) string {
 	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
@@ -195,7 +195,6 @@ func executeCheck(event *v2.Event) (int, error) {
 }
 
 //Create service interface to help with mock testing
-// FIXME: replace s3 functions with correct service functions from AWS SDK
 type ServiceAPI interface {
 	ListMetrics(ctx context.Context,
 		params *cloudwatch.ListMetricsInput,
@@ -214,7 +213,6 @@ func GetMetricData(c context.Context, api ServiceAPI, input *cloudwatch.GetMetri
 }
 
 // Note: Use ServiceAPI interface definition to make function testable with mock API testing pattern
-// FIXME: replace s3 with correct service from AWS SDK
 func buildListMetricsInput() (*cloudwatch.ListMetricsInput, error) {
 	input := &cloudwatch.ListMetricsInput{}
 	if plugin.RecentlyActive {
@@ -238,11 +236,11 @@ func buildLabelBase(m types.Metric) string {
 	return labelString
 }
 
-func buildGetMetricDataInput(m types.Metric) (*cloudwatch.GetMetricDataInput, error) {
-	metricDataQueries := []types.MetricDataQuery{}
+func buildMetricDataQueries(m types.Metric, stats []string) ([]types.MetricDataQuery, error) {
+	dataQueries := []types.MetricDataQuery{}
 	s := strings.Split(*m.Namespace, "/")
 
-	for _, stat := range []string{"SampleCount", "Average", "Maximum", "Minimum", "Sum"} {
+	for _, stat := range stats {
 		idString := fmt.Sprintf("%v_%v_%v_%v", toSnakeCase(s[0]), toSnakeCase(s[1]), toSnakeCase(*m.MetricName), toSnakeCase(stat))
 		labelString := fmt.Sprintf("%v.%v", buildLabelBase(m), toSnakeCase(stat))
 		dataQuery := types.MetricDataQuery{
@@ -254,8 +252,12 @@ func buildGetMetricDataInput(m types.Metric) (*cloudwatch.GetMetricDataInput, er
 				Stat:   aws.String(stat),
 			},
 		}
-		metricDataQueries = append(metricDataQueries, dataQuery)
+		dataQueries = append(dataQueries, dataQuery)
 	}
+	return dataQueries, nil
+}
+
+func buildGetMetricDataInput(metricDataQueries []types.MetricDataQuery) (*cloudwatch.GetMetricDataInput, error) {
 	input := &cloudwatch.GetMetricDataInput{}
 	input.EndTime = aws.Time(time.Unix(time.Now().Unix(), 0))
 	input.StartTime = aws.Time(time.Unix(time.Now().Add(time.Duration(-plugin.PeriodMinutes)*time.Minute).Unix(), 0))
@@ -267,7 +269,10 @@ func checkFunction(client ServiceAPI) (int, error) {
 	numMetrics := 0
 	numPages := 0
 	dataMessages := []types.MessageData{}
+	metricDataQueries := []types.MetricDataQuery{}
+
 	outputStrings := []string{}
+	stats := []string{"SampleCount", "Average", "Maximum", "Minimum", "Sum"}
 
 	if plugin.Verbose {
 		fmt.Println("Metrics:")
@@ -306,44 +311,58 @@ func checkFunction(client ServiceAPI) (int, error) {
 
 			}
 			numMetrics++
-
-			getMetricDataInput, err := buildGetMetricDataInput(m)
+			metricQueries, err := buildMetricDataQueries(m, stats)
 			if err != nil {
-				fmt.Println("Could not build GetMetricsDataInput")
+				fmt.Println("Could not build DataQuery")
 				return sensu.CheckStateCritical, nil
 			}
-			if plugin.DryRun {
-				outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", buildLabelBase(m), *m.Namespace, *m.MetricName, dimString))
-			} else {
-				dataResult, err := GetMetricData(context.TODO(), client, getMetricDataInput)
+			metricDataQueries = append(metricDataQueries, metricQueries...)
+
+			i := 0
+			for i < len(metricDataQueries) {
+				j := i + 500
+				if j >= len(metricDataQueries) {
+					j = len(metricDataQueries) - 1
+				}
+				getMetricDataInput, err := buildGetMetricDataInput(metricDataQueries[i:j])
+				i = j + 1
 				if err != nil {
-					fmt.Printf("Could not get metrics: %v\n", err)
+					fmt.Println("Could not build GetMetricsDataInput")
 					return sensu.CheckStateCritical, nil
 				}
-				for _, d := range dataResult.MetricDataResults {
-					if len(d.Timestamps) > 0 {
-						outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", *d.Label, *m.Namespace, *m.MetricName, dimString))
-						for i := range d.Timestamps {
-							outputStrings = append(outputStrings, fmt.Sprintf("%v{%v} %v %v", *d.Label, dimString, d.Values[i], d.Timestamps[i].Unix()))
-						}
-						outputStrings = append(outputStrings, "")
+				if plugin.DryRun {
+					outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", buildLabelBase(m), *m.Namespace, *m.MetricName, dimString))
+				} else {
+					dataResult, err := GetMetricData(context.TODO(), client, getMetricDataInput)
+					if err != nil {
+						fmt.Printf("Could not get metrics: %v\n", err)
+						return sensu.CheckStateCritical, nil
 					}
-				}
-				if plugin.Verbose {
-					fmt.Printf("   NextToken: %+v\n", dataResult.NextToken)
-					fmt.Printf("   Messages: %+v\n", dataResult.Messages)
-					fmt.Printf("   Data Results:\n")
 					for _, d := range dataResult.MetricDataResults {
-						fmt.Printf("     Id: %v\n", *d.Id)
-						fmt.Printf("     Label: %+v\n", *d.Label)
-						fmt.Printf("     StatusCode: %+v\n", d.StatusCode)
-						fmt.Printf("     Timestamps: %+v\n", d.Timestamps)
-						fmt.Printf("     Values: %+v\n", d.Values)
+						if len(d.Timestamps) > 0 {
+							outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", *d.Label, *m.Namespace, *m.MetricName, dimString))
+							for i := range d.Timestamps {
+								outputStrings = append(outputStrings, fmt.Sprintf("%v{%v} %v %v", *d.Label, dimString, d.Values[i], d.Timestamps[i].Unix()))
+							}
+							outputStrings = append(outputStrings, "")
+						}
 					}
-					fmt.Println("")
-				}
-				if len(dataResult.Messages) > 0 {
-					dataMessages = append(dataMessages, dataResult.Messages...)
+					if plugin.Verbose {
+						fmt.Printf("   NextToken: %+v\n", dataResult.NextToken)
+						fmt.Printf("   Messages: %+v\n", dataResult.Messages)
+						fmt.Printf("   Data Results:\n")
+						for _, d := range dataResult.MetricDataResults {
+							fmt.Printf("     Id: %v\n", *d.Id)
+							fmt.Printf("     Label: %+v\n", *d.Label)
+							fmt.Printf("     StatusCode: %+v\n", d.StatusCode)
+							fmt.Printf("     Timestamps: %+v\n", d.Timestamps)
+							fmt.Printf("     Values: %+v\n", d.Values)
+						}
+						fmt.Println("")
+					}
+					if len(dataResult.Messages) > 0 {
+						dataMessages = append(dataMessages, dataResult.Messages...)
+					}
 				}
 			}
 
