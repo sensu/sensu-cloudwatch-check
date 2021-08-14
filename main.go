@@ -269,7 +269,6 @@ func checkFunction(client ServiceAPI) (int, error) {
 	numMetrics := 0
 	numPages := 0
 	dataMessages := []types.MessageData{}
-	metricDataQueries := []types.MetricDataQuery{}
 
 	outputStrings := []string{}
 	stats := []string{"SampleCount", "Average", "Maximum", "Minimum", "Sum"}
@@ -311,6 +310,7 @@ func checkFunction(client ServiceAPI) (int, error) {
 
 			}
 			numMetrics++
+			metricDataQueries := []types.MetricDataQuery{}
 			metricQueries, err := buildMetricDataQueries(m, stats)
 			if err != nil {
 				fmt.Println("Could not build DataQuery")
