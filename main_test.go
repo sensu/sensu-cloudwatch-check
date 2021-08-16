@@ -19,6 +19,7 @@ var (
 
 type mockService struct {
 	statusCode      types.StatusCode
+	dataResultId    string
 	includeMessages bool
 }
 
@@ -54,13 +55,12 @@ func (m mockService) ListMetrics(ctx context.Context,
 func (m mockService) GetMetricData(ctx context.Context,
 	params *cloudwatch.GetMetricDataInput,
 	optFns ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
-	name := "test"
-	namespace := "AWS/test"
-	// Create a list of two dummy metrics
-	results := []types.MetricDataResult{
-		types.MetricDataResult{
-			Id:         &name,
-			Label:      &namespace,
+	results := []types.MetricDataResult{}
+	for _, d := range params.MetricDataQueries {
+		// Create a list of two dummy metrics
+		result := types.MetricDataResult{
+			Id:         d.Id,
+			Label:      d.Label,
 			StatusCode: m.statusCode,
 			Timestamps: []time.Time{
 				time.Now(),
@@ -68,7 +68,8 @@ func (m mockService) GetMetricData(ctx context.Context,
 			Values: []float64{
 				0.0,
 			},
-		},
+		}
+		results = append(results, result)
 	}
 	output := &cloudwatch.GetMetricDataOutput{
 		MetricDataResults: results,
@@ -89,24 +90,43 @@ func TestGetMetricData(t *testing.T) {
 	cases := []struct {
 		client             mockService
 		expectedStatusCode types.StatusCode
+		expectedId         string
 	}{ //start of array
 		{ //start of struct
 			client:             mockService{},
 			expectedStatusCode: "Complete",
+			expectedId:         "test",
 		},
 	}
 	for i, tt := range cases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			client := tt.client
 			client.statusCode = tt.expectedStatusCode
+			client.dataResultId = tt.expectedId
 			input := &cloudwatch.GetMetricDataInput{}
 			output, err := client.GetMetricData(context.TODO(), input)
 			if err != nil {
 				t.Fatalf("expect no error, got %v", err)
 			}
-			if len(output.MetricDataResults) == 0 {
-				t.Fatalf("expected at least 1 data return")
+			if len(output.MetricDataResults) != 0 {
+				t.Fatalf("expected 0 data results")
 			}
+			id := "test"
+			input = &cloudwatch.GetMetricDataInput{
+				MetricDataQueries: []types.MetricDataQuery{
+					types.MetricDataQuery{
+						Id: &id,
+					},
+				},
+			}
+			output, err = client.GetMetricData(context.TODO(), input)
+			if err != nil {
+				t.Fatalf("expect no error, got %v", err)
+			}
+			if len(output.MetricDataResults) != 1 {
+				t.Fatalf("expected 1 data result")
+			}
+
 			for _, o := range output.MetricDataResults {
 				if o.StatusCode != tt.expectedStatusCode {
 					t.Errorf("expect status: %v, got %v", tt.expectedStatusCode, o.StatusCode)
@@ -188,6 +208,7 @@ func TestCheckFunction(t *testing.T) {
 		nextToken       bool
 		maxPages        int
 		includeMessages bool
+		expectedId      string
 	}{ //start of array
 		{ //start of struct
 			client:          mockService{},
@@ -195,6 +216,7 @@ func TestCheckFunction(t *testing.T) {
 			nextToken:       true,
 			expectedState:   0,
 			includeMessages: false,
+			expectedId:      "test",
 		},
 		{ //start of struct
 			client:          mockService{},
@@ -202,6 +224,7 @@ func TestCheckFunction(t *testing.T) {
 			nextToken:       true,
 			expectedState:   1,
 			includeMessages: false,
+			expectedId:      "test",
 		},
 		{ //start of struct
 			client:          mockService{},
@@ -209,12 +232,14 @@ func TestCheckFunction(t *testing.T) {
 			nextToken:       true,
 			expectedState:   1,
 			includeMessages: true,
+			expectedId:      "test",
 		},
 	}
 	for i, tt := range cases {
 		t.Run("CheckFunction Run: "+strconv.Itoa(i), func(t *testing.T) {
 			client := tt.client
 			client.includeMessages = tt.includeMessages
+			client.dataResultId = tt.expectedId
 			nextToken = tt.nextToken
 			plugin.MaxPages = tt.maxPages
 			state, err := checkFunction(client)

@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/google/uuid"
 	v2 "github.com/sensu/sensu-go/api/core/v2"
 	sensuAWS "github.com/sensu/sensu-plugin-sdk/aws"
 	"github.com/sensu/sensu-plugin-sdk/sensu"
@@ -33,6 +34,11 @@ type Config struct {
 	RecentlyActive         bool
 	MaxPages               int
 	PeriodMinutes          int
+}
+
+type MetricQueryMap struct {
+	Id     *string
+	Metric *types.Metric
 }
 
 var (
@@ -236,12 +242,13 @@ func buildLabelBase(m types.Metric) string {
 	return labelString
 }
 
-func buildMetricDataQueries(m types.Metric, stats []string) ([]types.MetricDataQuery, error) {
+func buildMetricDataQueries(m types.Metric, stats []string) ([]types.MetricDataQuery, map[string]MetricQueryMap, error) {
 	dataQueries := []types.MetricDataQuery{}
-	s := strings.Split(*m.Namespace, "/")
+	queryMap := make(map[string]MetricQueryMap)
 
 	for _, stat := range stats {
-		idString := fmt.Sprintf("%v_%v_%v_%v", toSnakeCase(s[0]), toSnakeCase(s[1]), toSnakeCase(*m.MetricName), toSnakeCase(stat))
+		id := uuid.New()
+		idString := "aws_" + strings.ReplaceAll(id.String(), "-", "_")
 		labelString := fmt.Sprintf("%v.%v", buildLabelBase(m), toSnakeCase(stat))
 		dataQuery := types.MetricDataQuery{
 			Id:    &idString,
@@ -252,9 +259,13 @@ func buildMetricDataQueries(m types.Metric, stats []string) ([]types.MetricDataQ
 				Stat:   aws.String(stat),
 			},
 		}
+		queryMap[idString] = MetricQueryMap{
+			Id:     &idString,
+			Metric: &m,
+		}
 		dataQueries = append(dataQueries, dataQuery)
 	}
-	return dataQueries, nil
+	return dataQueries, queryMap, nil
 }
 
 func buildGetMetricDataInput(metricDataQueries []types.MetricDataQuery) (*cloudwatch.GetMetricDataInput, error) {
@@ -265,10 +276,26 @@ func buildGetMetricDataInput(metricDataQueries []types.MetricDataQuery) (*cloudw
 	return input, nil
 }
 
+func dimString(m *types.Metric) string {
+	if m == nil {
+		return ""
+	}
+	dimStrings := []string{}
+	if len(m.Dimensions) > 0 {
+		for _, d := range m.Dimensions {
+			dimStrings = append(dimStrings, fmt.Sprintf(`%v="%v"`, *d.Name, *d.Value))
+		}
+	}
+	dimStr := strings.Join(dimStrings, ",")
+	return dimStr
+}
+
 func checkFunction(client ServiceAPI) (int, error) {
 	numMetrics := 0
 	numPages := 0
 	dataMessages := []types.MessageData{}
+	metricDataQueries := []types.MetricDataQuery{}
+	metricQueryMap := make(map[string]MetricQueryMap)
 
 	outputStrings := []string{}
 	stats := []string{"SampleCount", "Average", "Maximum", "Minimum", "Sum"}
@@ -295,11 +322,6 @@ func checkFunction(client ServiceAPI) (int, error) {
 			input.NextToken = listResult.NextToken
 		}
 		for _, m := range listResult.Metrics {
-			dimStrings := []string{}
-			for _, d := range m.Dimensions {
-				dimStrings = append(dimStrings, fmt.Sprintf(`%v="%v"`, *d.Name, *d.Value))
-			}
-			dimString := strings.Join(dimStrings, ",")
 			if plugin.Verbose {
 				fmt.Println("   Metric Name: " + *m.MetricName)
 				fmt.Println("   Namespace:   " + *m.Namespace)
@@ -310,62 +332,88 @@ func checkFunction(client ServiceAPI) (int, error) {
 
 			}
 			numMetrics++
-			metricDataQueries := []types.MetricDataQuery{}
-			metricQueries, err := buildMetricDataQueries(m, stats)
+			//Prepare data queries based on metric
+			metricQueries, metricMap, err := buildMetricDataQueries(m, stats)
 			if err != nil {
 				fmt.Println("Could not build DataQuery")
 				return sensu.CheckStateCritical, nil
 			}
+			// append data queries to global array
 			metricDataQueries = append(metricDataQueries, metricQueries...)
+			// add query metadata to global map query id map
+			for k, v := range metricMap {
+				metricQueryMap[k] = v
+			}
+		}
+	}
 
-			i := 0
-			for i < len(metricDataQueries) {
-				j := i + 500
-				if j >= len(metricDataQueries) {
-					j = len(metricDataQueries) - 1
-				}
-				getMetricDataInput, err := buildGetMetricDataInput(metricDataQueries[i:j])
-				i = j + 1
-				if err != nil {
-					fmt.Println("Could not build GetMetricsDataInput")
+	//Prepare the GetMetricData loop
+	i := 0
+	for i < len(metricDataQueries) {
+		//Pack up to 500 data queries into GetMetricData call
+		j := i + 500
+		if j >= len(metricDataQueries) {
+			j = len(metricDataQueries) - 1
+		}
+		dataQuerySlice := metricDataQueries[i:j]
+		i = j + 1
+		getMetricDataInput, err := buildGetMetricDataInput(dataQuerySlice)
+		if err != nil {
+			fmt.Println("Could not build GetMetricsDataInput")
+			return sensu.CheckStateCritical, nil
+		}
+
+		if plugin.DryRun {
+			for _, q := range dataQuerySlice {
+				m := metricQueryMap[*q.Id].Metric
+				if m != nil {
+					outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", buildLabelBase(*m), *m.Namespace, *m.MetricName, dimString(m)))
+				} else {
+					fmt.Printf("Could not look up MetricQuery: %v\n", *q.Id)
 					return sensu.CheckStateCritical, nil
 				}
-				if plugin.DryRun {
-					outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", buildLabelBase(m), *m.Namespace, *m.MetricName, dimString))
+			}
+		} else {
+			dataResult, err := GetMetricData(context.TODO(), client, getMetricDataInput)
+			if err != nil {
+				fmt.Printf("Could not get metrics: %v\n", err)
+				return sensu.CheckStateCritical, nil
+			}
+			if dataResult.NextToken != nil {
+				fmt.Printf("GetMetricData result too long")
+				return sensu.CheckStateCritical, nil
+			}
+			for _, d := range dataResult.MetricDataResults {
+				m := metricQueryMap[*d.Id].Metric
+				if m != nil {
+					if len(d.Timestamps) > 0 {
+						outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", *d.Label, *m.Namespace, *m.MetricName, dimString(m)))
+						for i := range d.Timestamps {
+							outputStrings = append(outputStrings, fmt.Sprintf("%v{%v} %v %v", *d.Label, dimString(m), d.Values[i], d.Timestamps[i].Unix()))
+						}
+						outputStrings = append(outputStrings, "")
+					}
 				} else {
-					dataResult, err := GetMetricData(context.TODO(), client, getMetricDataInput)
-					if err != nil {
-						fmt.Printf("Could not get metrics: %v\n", err)
-						return sensu.CheckStateCritical, nil
-					}
-					for _, d := range dataResult.MetricDataResults {
-						if len(d.Timestamps) > 0 {
-							outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", *d.Label, *m.Namespace, *m.MetricName, dimString))
-							for i := range d.Timestamps {
-								outputStrings = append(outputStrings, fmt.Sprintf("%v{%v} %v %v", *d.Label, dimString, d.Values[i], d.Timestamps[i].Unix()))
-							}
-							outputStrings = append(outputStrings, "")
-						}
-					}
-					if plugin.Verbose {
-						fmt.Printf("   NextToken: %+v\n", dataResult.NextToken)
-						fmt.Printf("   Messages: %+v\n", dataResult.Messages)
-						fmt.Printf("   Data Results:\n")
-						for _, d := range dataResult.MetricDataResults {
-							fmt.Printf("     Id: %v\n", *d.Id)
-							fmt.Printf("     Label: %+v\n", *d.Label)
-							fmt.Printf("     StatusCode: %+v\n", d.StatusCode)
-							fmt.Printf("     Timestamps: %+v\n", d.Timestamps)
-							fmt.Printf("     Values: %+v\n", d.Values)
-						}
-						fmt.Println("")
-					}
-					if len(dataResult.Messages) > 0 {
-						dataMessages = append(dataMessages, dataResult.Messages...)
-					}
+					fmt.Printf("Could not look up MetricQuery: %v\n", *d.Id)
+					return sensu.CheckStateCritical, nil
 				}
 			}
-
+			if plugin.Verbose {
+				fmt.Printf("   NextToken: %+v\n", dataResult.NextToken)
+				fmt.Printf("   Messages: %+v\n", dataResult.Messages)
+				fmt.Printf("   Data Results:\n")
+				for _, d := range dataResult.MetricDataResults {
+					fmt.Printf("     Id: %v\n", *d.Id)
+					fmt.Printf("     Label: %+v\n", *d.Label)
+					fmt.Printf("     StatusCode: %+v\n", d.StatusCode)
+					fmt.Printf("     Timestamps: %+v\n", d.Timestamps)
+					fmt.Printf("     Values: %+v\n", d.Values)
+				}
+				fmt.Println("")
+			}
+			if len(dataResult.Messages) > 0 {
+				dataMessages = append(dataMessages, dataResult.Messages...)
+			}
 		}
 
 	}
@@ -385,7 +433,7 @@ func checkFunction(client ServiceAPI) (int, error) {
 	if len(dataMessages) > 0 {
 		fmt.Println("# Warning: Some calls to GetMetricData resulted in error messages")
 		for _, m := range dataMessages {
-			fmt.Printf("# GetMetricData:: Code: %v Message: %v\n", m.Code, m.Value)
+			fmt.Printf("# GetMetricData:: Code: %v Message: %v\n", *m.Code, *m.Value)
 		}
 		warnFlag = true
 	}
