@@ -103,7 +103,7 @@ var (
 			Path:      "period-minutes",
 			Argument:  "period-minutes",
 			Shorthand: "p",
-			Default:   60,
+			Default:   1,
 			Usage:     "Period in minutes for metrics statistic calculation",
 			Value:     &plugin.PeriodMinutes,
 		},
