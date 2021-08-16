@@ -193,6 +193,26 @@ func TestCheckArgs(t *testing.T) {
 			t.Errorf("expect state: %v, got %v", 0, state)
 		}
 	})
+	plugin.DimensionFilterStrings = []string{"what=now", "brown=cow"}
+	t.Run("CheckArgs", func(t *testing.T) {
+		state, err := checkArgs(nil)
+		if err != nil {
+			t.Fatalf("expect no error, got %v", err)
+		}
+		if state != 0 {
+			t.Errorf("expect state: %v, got %v", 0, state)
+		}
+	})
+	plugin.DimensionFilterStrings = []string{"what=now=brown=cow", "when=where=what=why"}
+	t.Run("CheckArgs", func(t *testing.T) {
+		state, err := checkArgs(nil)
+		if err == nil {
+			t.Fatalf("expect error, got nil")
+		}
+		if state != 1 {
+			t.Errorf("expect state: %v, got %v", 1, state)
+		}
+	})
 	cleanPluginValues()
 }
 
@@ -231,6 +251,66 @@ func TestCheckFunction(t *testing.T) {
 			maxPages:        2,
 			nextToken:       true,
 			expectedState:   1,
+			includeMessages: true,
+			expectedId:      "test",
+		},
+	}
+	for i, tt := range cases {
+		t.Run("CheckFunction Run: "+strconv.Itoa(i), func(t *testing.T) {
+			client := tt.client
+			client.includeMessages = tt.includeMessages
+			client.dataResultId = tt.expectedId
+			nextToken = tt.nextToken
+			plugin.MaxPages = tt.maxPages
+			state, err := checkFunction(client)
+			if err != nil {
+				t.Fatalf("expect nil error, got %v", err)
+			}
+			if state != tt.expectedState {
+				t.Errorf("expect state: %v, got %v", tt.expectedState, state)
+			}
+		})
+
+	}
+	cleanPluginValues()
+}
+
+func TestCheckFunctionDryRun(t *testing.T) {
+	cleanPluginValues()
+	plugin.DryRun = true
+	plugin.RecentlyActive = true
+	plugin.MetricName = "test"
+	plugin.Namespace = "test"
+	plugin.Verbose = true
+	cases := []struct {
+		client          mockService
+		expectedState   int
+		nextToken       bool
+		maxPages        int
+		includeMessages bool
+		expectedId      string
+	}{ //start of array
+		{ //start of struct
+			client:          mockService{},
+			maxPages:        2,
+			nextToken:       true,
+			expectedState:   0,
+			includeMessages: false,
+			expectedId:      "test",
+		},
+		{ //start of struct
+			client:          mockService{},
+			maxPages:        1,
+			nextToken:       true,
+			expectedState:   1,
+			includeMessages: false,
+			expectedId:      "test",
+		},
+		{ //start of struct
+			client:          mockService{},
+			maxPages:        2,
+			nextToken:       true,
+			expectedState:   0,
 			includeMessages: true,
 			expectedId:      "test",
 		},
