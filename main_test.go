@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"log"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -9,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/stretchr/testify/assert"
 )
 
 // Create mockService Object to use in testing.
@@ -85,8 +88,37 @@ func (m mockService) GetMetricData(ctx context.Context,
 	return output, nil
 }
 
+func quiet() func() {
+	null, _ := os.Open(os.DevNull)
+	sout := os.Stdout
+	serr := os.Stderr
+	os.Stdout = null
+	os.Stderr = null
+	log.SetOutput(null)
+	return func() {
+		defer null.Close()
+		os.Stdout = sout
+		os.Stderr = serr
+		log.SetOutput(os.Stderr)
+	}
+}
+
+func cleanPluginValues() {
+	plugin.Verbose = false
+	plugin.RecentlyActive = false
+	plugin.DryRun = false
+	plugin.ConfigString = ""
+	plugin.MetricName = ""
+	plugin.Namespace = ""
+	plugin.MaxPages = 0
+	plugin.PeriodMinutes = 0
+
+}
+
 func TestGetMetricData(t *testing.T) {
+	defer quiet()()
 	cleanPluginValues()
+
 	cases := []struct {
 		client             mockService
 		expectedStatusCode types.StatusCode
@@ -137,19 +169,17 @@ func TestGetMetricData(t *testing.T) {
 	}
 	cleanPluginValues()
 }
-func cleanPluginValues() {
-	plugin.Verbose = false
-	plugin.RecentlyActive = false
-	plugin.DryRun = false
-	plugin.ConfigString = ""
-	plugin.MetricName = ""
-	plugin.Namespace = ""
-	plugin.MaxPages = 0
-	plugin.PeriodMinutes = 0
-
+func TestBuildMetricLabels(t *testing.T) {
+	assert := assert.New(t)
+	jsonStr := []byte(`[{"label": "aws.test.label", "namespace" : "AWS/TEST", "metric-name": "Test", "stat" : "Average" }]`)
+	key := "aws/test::test::average"
+	result, err := buildMetricLabels(jsonStr)
+	assert.NoError(err)
+	assert.NotNil(result[key])
 }
 
 func TestToSnakeCase(t *testing.T) {
+	defer quiet()()
 	tests := []struct {
 		input string
 		want  string
@@ -172,6 +202,7 @@ func TestToSnakeCase(t *testing.T) {
 	}
 }
 func TestCheckArgs(t *testing.T) {
+	defer quiet()()
 	cleanPluginValues()
 	plugin.Verbose = true
 	t.Run("CheckArgs", func(t *testing.T) {
@@ -217,6 +248,7 @@ func TestCheckArgs(t *testing.T) {
 }
 
 func TestCheckFunction(t *testing.T) {
+	defer quiet()()
 	cleanPluginValues()
 	plugin.RecentlyActive = true
 	plugin.MetricName = "test"
@@ -276,6 +308,7 @@ func TestCheckFunction(t *testing.T) {
 }
 
 func TestCheckFunctionDryRun(t *testing.T) {
+	defer quiet()()
 	cleanPluginValues()
 	plugin.DryRun = true
 	plugin.RecentlyActive = true

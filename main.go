@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -40,6 +41,13 @@ type MetricQueryMap struct {
 	Id     *string
 	Label  *string
 	Metric *types.Metric
+}
+
+type MetricLabel struct {
+	Label      string `json:"label"`
+	Namespace  string `json:"namespace"`
+	MetricName string `json:"metric-name"`
+	Stat       string `json:"stat"`
 }
 
 var (
@@ -128,6 +136,8 @@ var (
 	// Setup regexp for use with toSnakeCase
 	matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
 	matchAllCap   = regexp.MustCompile("([a-z0-9])([A-Z])")
+	// Keyed list of metricConfig lookup table
+	metricConfig = make(map[string]MetricLabel)
 )
 
 func init() {
@@ -138,6 +148,44 @@ func init() {
 func main() {
 	check := sensu.NewGoCheck(&plugin.PluginConfig, options, checkArgs, executeCheck, false)
 	check.Execute()
+}
+
+func buildConfigKey(m types.MetricStat) string {
+	return strings.ToLower(*m.Metric.Namespace + "::" + *m.Metric.MetricName + "::" + *m.Stat)
+	return ""
+}
+
+func (m MetricLabel) buildConfigKey() string {
+	if len(m.Namespace) > 0 && len(m.MetricName) > 0 && len(m.Stat) > 0 {
+		return strings.ToLower(m.Namespace + "::" + m.MetricName + "::" + m.Stat)
+	} else {
+		fmt.Println(len(m.Namespace), len(m.MetricName), len(m.Stat))
+		return ""
+	}
+}
+
+func buildMetricLabels(jsonBlob []byte) (map[string]MetricLabel, error) {
+	objs := []MetricLabel{}
+	metricLabels := make(map[string]MetricLabel)
+	err := json.Unmarshal(jsonBlob, &objs)
+	for _, o := range objs {
+		if len(o.Namespace) == 0 {
+			o.Namespace = plugin.Namespace
+		}
+		if len(o.MetricName) == 0 {
+			o.MetricName = plugin.MetricName
+		}
+		if len(o.Stat) == 0 {
+			o.Stat = "Average"
+		}
+		key := o.buildConfigKey()
+		if len(key) > 0 {
+			metricLabels[key] = o
+		} else {
+			return nil, err
+		}
+	}
+	return metricLabels, err
 }
 
 func toSnakeCase(str string) string {
@@ -185,6 +233,13 @@ func checkArgs(event *v2.Event) (int, error) {
 	// If haven't selected a cloudwatch filter argument switch to dryrun to avoid pulling data for all metrics
 	if len(plugin.Namespace) == 0 && len(plugin.MetricName) == 0 && !plugin.DryRun {
 		return sensu.CheckStateWarning, fmt.Errorf("Must select at least one of: --namespace, --metric, or --dry-run")
+	}
+	if len(plugin.ConfigString) > 0 {
+		result, err := buildMetricLabels([]byte(plugin.ConfigString))
+		if err != nil {
+			return sensu.CheckStateWarning, err
+		}
+		metricConfig = result
 	}
 	return sensu.CheckStateOK, nil
 }
