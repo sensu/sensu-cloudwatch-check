@@ -38,6 +38,7 @@ type Config struct {
 
 type MetricQueryMap struct {
 	Id     *string
+	Label  *string
 	Metric *types.Metric
 }
 
@@ -261,6 +262,7 @@ func buildMetricDataQueries(m types.Metric, stats []string) ([]types.MetricDataQ
 		}
 		queryMap[idString] = MetricQueryMap{
 			Id:     &idString,
+			Label:  &labelString,
 			Metric: &m,
 		}
 		dataQueries = append(dataQueries, dataQuery)
@@ -292,10 +294,12 @@ func dimString(m *types.Metric) string {
 
 func checkFunction(client ServiceAPI) (int, error) {
 	numMetrics := 0
+	numResults := 0
 	numPages := 0
 	dataMessages := []types.MessageData{}
 	metricDataQueries := []types.MetricDataQuery{}
 	metricQueryMap := make(map[string]MetricQueryMap)
+	unusedQueryMap := make(map[string]MetricQueryMap)
 
 	outputStrings := []string{}
 	stats := []string{"SampleCount", "Average", "Maximum", "Minimum", "Sum"}
@@ -303,6 +307,8 @@ func checkFunction(client ServiceAPI) (int, error) {
 	if plugin.Verbose {
 		fmt.Println("Metrics:")
 	}
+
+	//List Metrics result page loop
 	for getList := true; getList && numPages < plugin.MaxPages; {
 		getList = false
 		input, err := buildListMetricsInput()
@@ -343,6 +349,7 @@ func checkFunction(client ServiceAPI) (int, error) {
 			// add query metadata to global map query id map
 			for k, v := range metricMap {
 				metricQueryMap[k] = v
+				unusedQueryMap[k] = v
 			}
 		}
 	}
@@ -352,26 +359,27 @@ func checkFunction(client ServiceAPI) (int, error) {
 	for i < len(metricDataQueries) {
 		//Pack up to 500 data queries into GetMetricData call
 		j := i + 500
-		if j >= len(metricDataQueries) {
-			j = len(metricDataQueries) - 1
+		if j > len(metricDataQueries) {
+			j = len(metricDataQueries)
 		}
 		dataQuerySlice := metricDataQueries[i:j]
-		i = j + 1
 		getMetricDataInput, err := buildGetMetricDataInput(dataQuerySlice)
 		if err != nil {
 			fmt.Println("Could not build GetMetricsDataInput")
 			return sensu.CheckStateCritical, nil
 		}
+		i = j + 1
 
 		if plugin.DryRun {
 			for _, q := range dataQuerySlice {
 				m := metricQueryMap[*q.Id].Metric
-				if m != nil {
-					outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", buildLabelBase(*m), *m.Namespace, *m.MetricName, dimString(m)))
-				} else {
+				if m == nil {
 					fmt.Printf("Could not look up MetricQuery: %v\n", *q.Id)
 					return sensu.CheckStateCritical, nil
 				}
+				delete(unusedQueryMap, *q.Id)
+				outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", *q.Label, *m.Namespace, *m.MetricName, dimString(m)))
+
 			}
 		} else {
 			dataResult, err := GetMetricData(context.TODO(), client, getMetricDataInput)
@@ -384,18 +392,18 @@ func checkFunction(client ServiceAPI) (int, error) {
 				return sensu.CheckStateCritical, nil
 			}
 			for _, d := range dataResult.MetricDataResults {
+				numResults++
 				m := metricQueryMap[*d.Id].Metric
-				if m != nil {
-					if len(d.Timestamps) > 0 {
-						outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", *d.Label, *m.Namespace, *m.MetricName, dimString(m)))
-						for i := range d.Timestamps {
-							outputStrings = append(outputStrings, fmt.Sprintf("%v{%v} %v %v", *d.Label, dimString(m), d.Values[i], d.Timestamps[i].Unix()))
-						}
-						outputStrings = append(outputStrings, "")
-					}
-				} else {
+				if m == nil {
 					fmt.Printf("Could not look up MetricQuery: %v\n", *d.Id)
 					return sensu.CheckStateCritical, nil
+				}
+				if len(d.Timestamps) > 0 {
+					delete(unusedQueryMap, *d.Id)
+					outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", *d.Label, *m.Namespace, *m.MetricName, dimString(m)))
+					for i := range d.Timestamps {
+						outputStrings = append(outputStrings, fmt.Sprintf("%v{%v} %v %v", *d.Label, dimString(m), d.Values[i], d.Timestamps[i].Unix()))
+					}
 				}
 			}
 			if plugin.Verbose {
@@ -442,6 +450,18 @@ func checkFunction(client ServiceAPI) (int, error) {
 	}
 	for _, s := range outputStrings {
 		fmt.Println(s)
+	}
+	if plugin.Verbose {
+		fmt.Println("Summary:")
+		fmt.Printf("  Number of Metrics: %v\n  MetricDataQueries: %v\n  QueryMaps: %v\n", numMetrics, len(metricDataQueries), len(metricQueryMap))
+		fmt.Printf("  Number of MetricDataResults: %v\n", numResults)
+		if len(unusedQueryMap) > 0 {
+			fmt.Printf("  MetricDataQueries with no results:\n")
+
+			for _, q := range unusedQueryMap {
+				fmt.Printf("    Label: %v\n      Namespace:%v MetricName:%v Dimensions:%v\n", *q.Label, *q.Metric.Namespace, *q.Metric.MetricName, dimString(q.Metric))
+			}
+		}
 	}
 	return sensu.CheckStateOK, nil
 }
