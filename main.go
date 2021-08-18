@@ -389,6 +389,10 @@ func checkFunction(client ServiceAPI) (int, error) {
 		fmt.Println("Could not build DataQuery")
 		return sensu.CheckStateCritical, nil
 	}
+	if len(metricDataQueries) == 0 {
+		fmt.Println("No metricDataQueries to process")
+		return sensu.CheckStateWarning, nil
+	}
 
 	metricQueryMap := make(map[string]MetricQueryMap)
 	unusedQueryMap := make(map[string]MetricQueryMap)

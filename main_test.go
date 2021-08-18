@@ -111,6 +111,7 @@ func quiet() func() {
 }
 
 func cleanPluginValues() {
+	plugin.StatsList = []string{}
 	plugin.Verbose = false
 	plugin.RecentlyActive = false
 	plugin.DryRun = false
@@ -274,6 +275,7 @@ func TestCheckFunction(t *testing.T) {
 	plugin.MetricName = "test"
 	plugin.Namespace = "test"
 	plugin.Verbose = true
+	plugin.StatsList = []string{"Average"}
 	cases := []struct {
 		client          mockService
 		expectedState   int
@@ -302,7 +304,7 @@ func TestCheckFunction(t *testing.T) {
 			client:          mockService{},
 			maxPages:        2,
 			nextToken:       true,
-			expectedState:   0,
+			expectedState:   1,
 			includeMessages: true,
 			expectedId:      "test",
 		},
@@ -336,6 +338,7 @@ func TestCheckFunctionDryRun(t *testing.T) {
 	plugin.MetricName = "test"
 	plugin.Namespace = "test"
 	plugin.Verbose = true
+	plugin.StatsList = []string{"Average"}
 	cases := []struct {
 		client          mockService
 		expectedState   int
