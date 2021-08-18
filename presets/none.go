@@ -19,15 +19,15 @@ type None struct {
 	MeasurementString string
 }
 
-func (p *None) Init() error {
+func (p *None) Init(verbose bool) error {
 	return nil
 }
 
-func (p *None) AddMetrics(metrics []types.Metric) {
+func (p *None) AddMetrics(metrics []types.Metric) error {
 	for _, m := range metrics {
 		p.Metrics = append(p.Metrics, m)
 	}
-	return
+	return nil
 }
 
 func (p *None) AddDimensionFilters(filters []types.DimensionFilter) {

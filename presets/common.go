@@ -15,11 +15,11 @@ func init() {
 
 type ServicePreset interface {
 	BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, error)
-	AddMetrics(metrics []types.Metric)
+	AddMetrics(metrics []types.Metric) error
 	GetNamespace() string
 	GetMetricName() string
 	GetDimensionFilters() []types.DimensionFilter
-	Init() error
+	Init(verbose bool) error
 }
 
 type StatConfig struct {

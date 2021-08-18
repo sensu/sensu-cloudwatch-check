@@ -344,7 +344,7 @@ func checkFunction(client ServiceAPI) (int, error) {
 		none.AddDimensionFilters(plugin.DimensionFilters)
 		plugin.Preset = none
 	}
-	plugin.Preset.Init()
+	plugin.Preset.Init(false)
 	//List Metrics result page loop
 	for getList := true; getList && numPages < plugin.MaxPages; {
 		getList = false

@@ -19,9 +19,13 @@ type ELB struct {
 	MetricName        string
 	MeasurementString string
 	configMap         map[string][]StatConfig
+	verbose           bool
+	Strict            bool
+	Description       string
 }
 
-func (p *ELB) Init() error {
+func (p *ELB) Init(verbose bool) error {
+	p.verbose = verbose
 	p.Namespace = "AWS/ELB"
 	p.Stats = []string{"Average"}
 	if filters, err := common.BuildDimensionFilters([]string{
@@ -30,11 +34,86 @@ func (p *ELB) Init() error {
 	} else {
 		return err
 	}
+
+	// JSON Config String developed on 2021-08-18 from AWS Cloudwatch documentation
+	//  Ref: https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-cloudwatch-metrics.html#loadbalancing-metrics-clb
 	p.MeasurementString = `{"metrics" : 
-                                  [{"metric" : "test" , "config" : 
-				      [{"stat" : "Average"     , "measurement" : "aws.elb.test.ave" }, 
-                                       {"stat" : "Sum"         , "measurement" : "aws.elb.test.sum" }, 
-                                       {"stat" : "SampleCount" , "measurement" : "aws.elb.test.count" } 
+                                  [
+				   {"metric":"HTTPCode_ELB_4XX" , "config": 
+				      [
+                                       {"stat":"Sum" , "measurement":"aws.elb.httpcode_elb_4xx"} 
+                                      ]	
+			           },
+				   {"metric":"HTTPCode_ELB_5XX" , "config": 
+				      [
+                                       {"stat":"Sum" , "measurement":"aws.elb.httpcode_elb_5xx"} 
+                                      ]	
+			           },
+				   {"metric":"HTTPCode_Backend_5XX" , "config": 
+				      [
+                                       {"stat":"Sum" , "measurement":"aws.elb.httpcode_backend_5xx"} 
+                                      ]	
+			           },
+				   {"metric":"HTTPCode_Backend_4XX" , "config": 
+				      [
+                                       {"stat":"Sum" , "measurement":"aws.elb.httpcode_backend_4xx"} 
+                                      ]	
+			           },
+				   {"metric":"HTTPCode_Backend_3XX" , "config": 
+				      [
+                                       {"stat":"Sum" , "measurement":"aws.elb.httpcode_backend_3xx"} 
+                                      ]	
+			           },
+				   {"metric":"HTTPCode_Backend_2XX" , "config": 
+				      [
+                                       {"stat":"Sum" , "measurement":"aws.elb.httpcode_backend_2xx"} 
+                                      ]	
+			           },
+				   {"metric":"BackendConnectionErrors" , "config": 
+				      [
+                                       {"stat":"Sum" , "measurement":"aws.elb.backend_connection_errors"} 
+                                      ]	
+			           },
+				   {"metric":"DesyncMitigationMode_NonCompliant_Request_Count" , "config": 
+				      [
+                                       {"stat":"Sum" , "measurement":"aws.elb.noncompliant_requests"} 
+                                      ]	
+			           },
+				   {"metric":"RequestCount" , "config": 
+				      [
+                                       {"stat":"Sum" , "measurement":"aws.elb.request_count"} 
+                                      ]	
+			           },
+				   {"metric":"SpilloverCount" , "config": 
+				      [
+                                       {"stat":"Sum" , "measurement":"aws.elb.spillover_count"} 
+                                      ]	
+			           },
+				   {"metric":"Latency" , "config": 
+				      [
+                                       {"stat":"Maximum" , "measurement":"aws.elb.latency.maximum"},
+                                       {"stat":"Average" , "measurement":"aws.elb.latency.average"} 
+                                      ]	
+			           },
+				   {"metric":"SurgeQueueLength" , "config": 
+				      [
+                                       {"stat":"Maximum" , "measurement":"aws.elb.surge_queue_length.maximum"},
+                                       {"stat":"Minimum" , "measurement":"aws.elb.surge_queue_length.minimum"},
+                                       {"stat":"Average" , "measurement":"aws.elb.surge_queue_length.average"} 
+                                      ]	
+			           },
+				   {"metric":"HealthyHostCount" , "config": 
+				      [
+                                       {"stat":"Maximum" , "measurement":"aws.elb.healthy_host_count.maximum"},
+                                       {"stat":"Minimum" , "measurement":"aws.elb.healthy_host_count.minimum"},
+                                       {"stat":"Average" , "measurement":"aws.elb.healthy_host_count.average"} 
+                                      ]	
+			           },
+				   {"metric":"UnHealthyHostCount" , "config": 
+				      [
+                                       {"stat":"Maximum" , "measurement":"aws.elb.unhealthy_host_count.maximum"},
+                                       {"stat":"Minimum" , "measurement":"aws.elb.unhealthy_host_count.minimum"},
+                                       {"stat":"Average" , "measurement":"aws.elb.unhealthy_host_count.average"} 
                                       ]	
 			           }
 			          ]
@@ -55,11 +134,30 @@ func (p *ELB) Init() error {
 	return nil
 }
 
-func (p *ELB) AddMetrics(metrics []types.Metric) {
+func (p *ELB) AddMetrics(metrics []types.Metric) error {
+	errStrings := []string{}
 	for _, m := range metrics {
-		p.Metrics = append(p.Metrics, m)
+		if p.verbose {
+			fmt.Printf("ELB.AddMetrics: Metric: %v\n", *m.MetricName)
+		}
+		if _, ok := p.configMap[*m.MetricName]; ok {
+			if p.verbose {
+				fmt.Printf("ELB.AddMetrics: Found config for Metric: %v\n", *m.MetricName)
+			}
+			p.Metrics = append(p.Metrics, m)
+		} else {
+			str := fmt.Sprintf("ELB.AddMetrics: No config for Metric: %v\n", *m.MetricName)
+			if p.verbose {
+				fmt.Println(str)
+			}
+			errStrings = append(errStrings, str)
+		}
 	}
-	return
+	if len(errStrings) > 0 {
+		return fmt.Errorf("%v", strings.Join(errStrings, ""))
+	} else {
+		return nil
+	}
 }
 
 func (p *ELB) AddDimensionFilters(filters []types.DimensionFilter) {
@@ -90,21 +188,30 @@ func (p *ELB) GetMetricName() string {
 
 func (p *ELB) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, error) {
 	dataQueries := []types.MetricDataQuery{}
-	for i, _ := range p.Metrics {
-		for j, _ := range p.Stats {
-			id := uuid.New()
-			idString := "aws_" + strings.ReplaceAll(id.String(), "-", "_")
-			labelString := fmt.Sprintf("%v.%v", common.BuildLabelBase(p.Metrics[i]), common.ToSnakeCase(p.Stats[j]))
-			dataQuery := types.MetricDataQuery{
-				Id:    &idString,
-				Label: &labelString,
-				MetricStat: &types.MetricStat{
-					Metric: &p.Metrics[i],
-					Period: aws.Int32(60 * period),
-					Stat:   aws.String(p.Stats[j]),
-				},
+	for _, m := range p.Metrics {
+		if statConfigs, ok := p.configMap[*m.MetricName]; ok {
+			for _, config := range statConfigs {
+				stat := config.Stat
+				measurement := config.Measurement
+				id := uuid.New()
+				idString := "aws_" + strings.ReplaceAll(id.String(), "-", "_")
+				if p.verbose {
+					fmt.Printf("ELB.BuildMetricDataQueries: %v %v %v %v\n", *m.MetricName, idString, stat, measurement)
+				}
+				labelString := measurement
+				dataQuery := types.MetricDataQuery{
+					Id:    &idString,
+					Label: &labelString,
+					MetricStat: &types.MetricStat{
+						Metric: &m,
+						Period: aws.Int32(60 * period),
+						Stat:   aws.String(stat),
+					},
+				}
+				dataQueries = append(dataQueries, dataQuery)
 			}
-			dataQueries = append(dataQueries, dataQuery)
+		} else {
+			fmt.Printf("ELB.BuildMetricDataQueries no config for: %v\n", *m.MetricName)
 		}
 	}
 	return dataQueries, nil
