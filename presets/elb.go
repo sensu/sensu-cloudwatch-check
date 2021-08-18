@@ -1,6 +1,7 @@
 package presets
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -17,7 +18,7 @@ type ELB struct {
 	Namespace         string
 	MetricName        string
 	MeasurementString string
-	measurementConfig MeasurementJSON
+	configMap         map[string][]StatConfig
 }
 
 func (p *ELB) Init() error {
@@ -28,6 +29,28 @@ func (p *ELB) Init() error {
 		p.DimensionFilters = filters
 	} else {
 		return err
+	}
+	p.MeasurementString = `{"metrics" : 
+                                  [{"metric" : "test" , "config" : 
+				      [{"stat" : "Average"     , "measurement" : "aws.elb.test.ave" }, 
+                                       {"stat" : "Sum"         , "measurement" : "aws.elb.test.sum" }, 
+                                       {"stat" : "SampleCount" , "measurement" : "aws.elb.test.count" } 
+                                      ]	
+			           }
+			          ]
+		     }
+		     `
+	measurementConfig := MeasurementJSON{}
+	if err := json.Unmarshal([]byte(p.MeasurementString), &measurementConfig); err != nil {
+		return err
+	}
+	p.configMap = make(map[string][]StatConfig)
+	for _, metric := range measurementConfig.Metrics {
+		p.configMap[metric.MetricName] = []StatConfig{}
+		for _, item := range metric.Config {
+			p.configMap[metric.MetricName] = append(p.configMap[metric.MetricName], item)
+		}
+
 	}
 	return nil
 }

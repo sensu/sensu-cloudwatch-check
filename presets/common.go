@@ -22,12 +22,14 @@ type ServicePreset interface {
 	Init() error
 }
 
+type StatConfig struct {
+	Stat        string `json:"stat"`
+	Measurement string `json:"measurement"`
+}
+type MetricConfig struct {
+	MetricName string       `json:"metric"`
+	Config     []StatConfig `json:"config"`
+}
 type MeasurementJSON struct {
-	Metrics []struct {
-		MetricName string `json:"metric"`
-		Config     []struct {
-			Stat        string `json:"stat"`
-			Measurement string `json:"measurement"`
-		} `json:"config"`
-	}
+	Metrics []MetricConfig `json:"metrics"`
 }
