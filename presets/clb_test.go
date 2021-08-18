@@ -30,18 +30,18 @@ func quiet() func() {
 	}
 }
 
-func TestELBInit(t *testing.T) {
+func TestCLBInit(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
-	elb := &ELB{}
+	elb := &CLB{}
 	err := elb.Init(true)
 	assert.NoError(err)
 }
 
-func TestELBAddMetrics(t *testing.T) {
+func TestCLBAddMetrics(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
-	elb := &ELB{}
+	elb := &CLB{}
 	err := elb.Init(false)
 	assert.NoError(err)
 	metricNames := []string{
@@ -83,10 +83,10 @@ func TestELBAddMetrics(t *testing.T) {
 	assert.NoError(err)
 }
 
-func TestELBBuildMetricDataQueries(t *testing.T) {
+func TestCLBBuildMetricDataQueries(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
-	elb := &ELB{}
+	elb := &CLB{}
 	err := elb.Init(false)
 	assert.NoError(err)
 	metricNames := []string{

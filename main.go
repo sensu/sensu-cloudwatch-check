@@ -243,7 +243,12 @@ func checkArgs(event *v2.Event) (int, error) {
 			plugin.Preset = p
 		} else {
 			keys := reflect.ValueOf(presets.Presets).MapKeys()
-			err := fmt.Errorf("Preset %v not defined\n Choose from: %v", plugin.PresetName, keys)
+			strArr := []string{}
+			for _, key := range keys {
+				str := fmt.Sprintf(" %v : %v\n", key.String(), presets.Presets[key.String()].GetDescription())
+				strArr = append(strArr, str)
+			}
+			err := fmt.Errorf("Preset %v not defined\nChoose from:\n%v", plugin.PresetName, strings.Join(strArr, ""))
 			return sensu.CheckStateWarning, err
 		}
 	} else {

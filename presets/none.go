@@ -17,6 +17,7 @@ type None struct {
 	Namespace         string
 	MetricName        string
 	MeasurementString string
+	Description       string
 }
 
 func (p *None) Init(verbose bool) error {
@@ -46,6 +47,10 @@ func (p *None) AddStats(stats []string) {
 
 func (p *None) GetDimensionFilters() []types.DimensionFilter {
 	return p.DimensionFilters
+}
+
+func (p *None) GetDescription() string {
+	return p.Description
 }
 
 func (p *None) GetNamespace() string {

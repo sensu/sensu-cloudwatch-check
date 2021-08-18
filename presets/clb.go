@@ -11,20 +11,105 @@ import (
 	"github.com/sensu/sensu-cloudwatch-check/common"
 )
 
-type ELB struct {
+type CLB struct {
 	Metrics           []types.Metric
 	Stats             []string
 	DimensionFilters  []types.DimensionFilter
 	Namespace         string
-	MetricName        string
 	MeasurementString string
 	configMap         map[string][]StatConfig
 	verbose           bool
-	Strict            bool
 	Description       string
+	Name              string
 }
 
-func (p *ELB) Init(verbose bool) error {
+func (p *CLB) AddDimensionFilters(filters []types.DimensionFilter) {
+	for _, f := range filters {
+		p.DimensionFilters = append(p.DimensionFilters, f)
+	}
+	return
+}
+
+func (p *CLB) AddStats(stats []string) {
+	for _, s := range stats {
+		p.Stats = append(p.Stats, s)
+	}
+	return
+}
+
+func (p *CLB) GetDimensionFilters() []types.DimensionFilter {
+	return p.DimensionFilters
+}
+
+func (p *CLB) GetNamespace() string {
+	return p.Namespace
+}
+func (p *CLB) GetMetricName() string {
+	return ""
+}
+
+func (p *CLB) GetDescription() string {
+	return p.Description
+}
+
+func (p *CLB) AddMetrics(metrics []types.Metric) error {
+	errStrings := []string{}
+	for _, m := range metrics {
+		if p.verbose {
+			fmt.Printf("CLB.AddMetrics: Metric: %v\n", *m.MetricName)
+		}
+		if _, ok := p.configMap[*m.MetricName]; ok {
+			if p.verbose {
+				fmt.Printf("CLB.AddMetrics: Found config for Metric: %v\n", *m.MetricName)
+			}
+			p.Metrics = append(p.Metrics, m)
+		} else {
+			str := fmt.Sprintf("CLB.AddMetrics: No config for Metric: %v\n", *m.MetricName)
+			if p.verbose {
+				fmt.Println(str)
+			}
+			errStrings = append(errStrings, str)
+		}
+	}
+	if len(errStrings) > 0 {
+		return fmt.Errorf("%v", strings.Join(errStrings, ""))
+	} else {
+		return nil
+	}
+}
+
+func (p *CLB) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, error) {
+	dataQueries := []types.MetricDataQuery{}
+	for _, m := range p.Metrics {
+		if statConfigs, ok := p.configMap[*m.MetricName]; ok {
+			for _, config := range statConfigs {
+				stat := config.Stat
+				measurement := config.Measurement
+				id := uuid.New()
+				idString := "aws_" + strings.ReplaceAll(id.String(), "-", "_")
+				if p.verbose {
+					fmt.Printf("CLB.BuildMetricDataQueries: %v %v %v %v\n", *m.MetricName, idString, stat, measurement)
+				}
+				labelString := measurement
+				dataQuery := types.MetricDataQuery{
+					Id:    &idString,
+					Label: &labelString,
+					MetricStat: &types.MetricStat{
+						Metric: &m,
+						Period: aws.Int32(60 * period),
+						Stat:   aws.String(stat),
+					},
+				}
+				dataQueries = append(dataQueries, dataQuery)
+			}
+		} else {
+			fmt.Printf("CLB.BuildMetricDataQueries no config for: %v\n", *m.MetricName)
+		}
+	}
+	return dataQueries, nil
+}
+
+func (p *CLB) Init(verbose bool) error {
 	p.verbose = verbose
 	p.Namespace = "AWS/ELB"
 	p.Stats = []string{"Average"}
@@ -132,87 +217,4 @@ func (p *ELB) Init(verbose bool) error {
 
 	}
 	return nil
-}
-
-func (p *ELB) AddMetrics(metrics []types.Metric) error {
-	errStrings := []string{}
-	for _, m := range metrics {
-		if p.verbose {
-			fmt.Printf("ELB.AddMetrics: Metric: %v\n", *m.MetricName)
-		}
-		if _, ok := p.configMap[*m.MetricName]; ok {
-			if p.verbose {
-				fmt.Printf("ELB.AddMetrics: Found config for Metric: %v\n", *m.MetricName)
-			}
-			p.Metrics = append(p.Metrics, m)
-		} else {
-			str := fmt.Sprintf("ELB.AddMetrics: No config for Metric: %v\n", *m.MetricName)
-			if p.verbose {
-				fmt.Println(str)
-			}
-			errStrings = append(errStrings, str)
-		}
-	}
-	if len(errStrings) > 0 {
-		return fmt.Errorf("%v", strings.Join(errStrings, ""))
-	} else {
-		return nil
-	}
-}
-
-func (p *ELB) AddDimensionFilters(filters []types.DimensionFilter) {
-	for _, f := range filters {
-		p.DimensionFilters = append(p.DimensionFilters, f)
-	}
-	return
-}
-
-func (p *ELB) AddStats(stats []string) {
-	for _, s := range stats {
-		p.Stats = append(p.Stats, s)
-	}
-	return
-}
-
-func (p *ELB) GetDimensionFilters() []types.DimensionFilter {
-	return p.DimensionFilters
-}
-
-func (p *ELB) GetNamespace() string {
-	return p.Namespace
-}
-
-func (p *ELB) GetMetricName() string {
-	return p.MetricName
-}
-
-func (p *ELB) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, error) {
-	dataQueries := []types.MetricDataQuery{}
-	for _, m := range p.Metrics {
-		if statConfigs, ok := p.configMap[*m.MetricName]; ok {
-			for _, config := range statConfigs {
-				stat := config.Stat
-				measurement := config.Measurement
-				id := uuid.New()
-				idString := "aws_" + strings.ReplaceAll(id.String(), "-", "_")
-				if p.verbose {
-					fmt.Printf("ELB.BuildMetricDataQueries: %v %v %v %v\n", *m.MetricName, idString, stat, measurement)
-				}
-				labelString := measurement
-				dataQuery := types.MetricDataQuery{
-					Id:    &idString,
-					Label: &labelString,
-					MetricStat: &types.MetricStat{
-						Metric: &m,
-						Period: aws.Int32(60 * period),
-						Stat:   aws.String(stat),
-					},
-				}
-				dataQueries = append(dataQueries, dataQuery)
-			}
-		} else {
-			fmt.Printf("ELB.BuildMetricDataQueries no config for: %v\n", *m.MetricName)
-		}
-	}
-	return dataQueries, nil
 }
