@@ -22,7 +22,11 @@ func ToSnakeCase(str string) string {
 
 func BuildLabelBase(m types.Metric) string {
 	s := strings.Split(*m.Namespace, "/")
-	labelString := ToSnakeCase(fmt.Sprintf("%v.%v.%v", ToSnakeCase(s[0]), ToSnakeCase(s[1]), ToSnakeCase(*m.MetricName)))
+	for i, _ := range s {
+		s[i] = ToSnakeCase(s[i])
+	}
+
+	labelString := ToSnakeCase(fmt.Sprintf("%v.%v", strings.Join(s, "."), ToSnakeCase(*m.MetricName)))
 	return labelString
 }
 

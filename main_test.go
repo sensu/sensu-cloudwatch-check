@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/sensu/sensu-cloudwatch-check/common"
+	"github.com/stretchr/testify/assert"
 )
 
 // Create mockService Object to use in testing.
@@ -213,56 +214,42 @@ func TestToSnakeCase(t *testing.T) {
 }
 func TestCheckArgs(t *testing.T) {
 	defer quiet()()
+	assert := assert.New(t)
 	cleanPluginValues()
 	t.Run("CheckArgs", func(t *testing.T) {
 		state, err := checkArgs(nil)
-		if err == nil {
-			t.Fatalf("expect error, got %v", err)
-		}
-		if state != 1 {
-			t.Errorf("expect state: %v, got %v", 1, state)
-		}
+		assert.Error(err)
+		assert.Equal(state, 1)
 	})
-	plugin.PresetName = "None"
-	plugin.Verbose = true
+	plugin.PresetName = "test"
 	t.Run("CheckArgs", func(t *testing.T) {
 		state, err := checkArgs(nil)
-		if err == nil {
-			t.Fatalf("expect error, got %v", err)
-		}
-		if state != 1 {
-			t.Errorf("expect state: %v, got %v", 1, state)
-		}
+		assert.Error(err)
+		assert.Equal(state, 1)
+	})
+	plugin.PresetName = "None"
+	t.Run("CheckArgs", func(t *testing.T) {
+		state, err := checkArgs(nil)
+		assert.Error(err)
+		assert.Equal(state, 1)
 	})
 	plugin.DryRun = true
 	t.Run("CheckArgs", func(t *testing.T) {
 		state, err := checkArgs(nil)
-		if err != nil {
-			t.Fatalf("expect no error, got %v", err)
-		}
-		if state != 0 {
-			t.Errorf("expect state: %v, got %v", 0, state)
-		}
+		assert.NoError(err)
+		assert.Equal(state, 0)
 	})
 	plugin.DimensionFilterStrings = []string{"what=now", "brown=cow"}
 	t.Run("CheckArgs", func(t *testing.T) {
 		state, err := checkArgs(nil)
-		if err != nil {
-			t.Fatalf("expect no error, got %v", err)
-		}
-		if state != 0 {
-			t.Errorf("expect state: %v, got %v", 0, state)
-		}
+		assert.NoError(err)
+		assert.Equal(state, 0)
 	})
 	plugin.DimensionFilterStrings = []string{"what=now=brown=cow", "when=where=what=why"}
 	t.Run("CheckArgs", func(t *testing.T) {
 		state, err := checkArgs(nil)
-		if err == nil {
-			t.Fatalf("expect error, got nil")
-		}
-		if state != 1 {
-			t.Errorf("expect state: %v, got %v", 1, state)
-		}
+		assert.Error(err)
+		assert.Equal(state, 1)
 	})
 	cleanPluginValues()
 }
