@@ -39,3 +39,19 @@ func DimString(dims []types.Dimension, region string) string {
 	dimStr := strings.Join(dimStrings, ",")
 	return dimStr
 }
+
+func BuildDimensionFilters(input []string) ([]types.DimensionFilter, error) {
+	output := []types.DimensionFilter{}
+	for _, item := range input {
+		segments := strings.Split(strings.TrimSpace(item), "=")
+		if len(segments) < 1 || len(segments) > 2 {
+			return nil, fmt.Errorf("Error parsing dimension filters")
+		}
+		filter := types.DimensionFilter{Name: &segments[0]}
+		if len(segments) > 1 {
+			filter.Value = &segments[1]
+		}
+		output = append(output, filter)
+	}
+	return output, nil
+}

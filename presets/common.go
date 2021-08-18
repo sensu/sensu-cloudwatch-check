@@ -10,6 +10,7 @@ var (
 
 func init() {
 	Presets["None"] = &None{}
+	Presets["ELB"] = &ELB{}
 }
 
 type ServicePreset interface {
