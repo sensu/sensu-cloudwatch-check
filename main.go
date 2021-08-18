@@ -2,17 +2,18 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"regexp"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/sensu/sensu-cloudwatch-check/common"
+	"github.com/sensu/sensu-cloudwatch-check/presets"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
-	"github.com/google/uuid"
 	v2 "github.com/sensu/sensu-go/api/core/v2"
 	sensuAWS "github.com/sensu/sensu-plugin-sdk/aws"
 	"github.com/sensu/sensu-plugin-sdk/sensu"
@@ -27,7 +28,6 @@ type Config struct {
 	//Additional configs for this check command
 	Namespace              string
 	MetricName             string
-	ConfigString           string
 	DimensionFilterStrings []string
 	DimensionFilters       []types.DimensionFilter
 	Verbose                bool
@@ -35,19 +35,30 @@ type Config struct {
 	RecentlyActive         bool
 	MaxPages               int
 	PeriodMinutes          int
+	StatsList              []string
+	PresetName             string
+	Preset                 presets.ServicePreset
+	// TODO: replace dryrun HELP with something useful
+	ServiceExplorer bool
+	// TODO: add support for json config
+	ConfigString string
 }
 
 type MetricQueryMap struct {
-	Id     *string
-	Label  *string
-	Metric *types.Metric
+	Id         string
+	Label      string
+	Namespace  string
+	MetricName string
+	Dimensions []types.Dimension
+	Metric     *types.Metric
 }
 
-type MetricLabel struct {
-	Label      string `json:"label"`
-	Namespace  string `json:"namespace"`
-	MetricName string `json:"metric-name"`
-	Stat       string `json:"stat"`
+type MetricConfig struct {
+	Measurement      string   `json:"measurement"`
+	Namespace        string   `json:"namespace"`
+	MetricName       string   `json:"metric-name"`
+	Stat             string   `json:"stat"`
+	DimensionFilters []string `json:"dimension-filters"`
 }
 
 var (
@@ -61,6 +72,7 @@ var (
 	}
 	//initialize options list with custom options
 	options = []*sensu.PluginConfigOption{
+		/* TODO: Add support for json config
 		&sensu.PluginConfigOption{
 			Path:      "config",
 			Argument:  "config",
@@ -69,6 +81,7 @@ var (
 			Usage:     "Configuration JSON string",
 			Value:     &plugin.ConfigString,
 		},
+		*/
 		&sensu.PluginConfigOption{
 			Path:     "recently-active",
 			Argument: "recently-active",
@@ -93,12 +106,28 @@ var (
 			Value:     &plugin.DimensionFilterStrings,
 		},
 		&sensu.PluginConfigOption{
+			Path:      "stats",
+			Argument:  "stats",
+			Shorthand: "S",
+			Default:   []string{"Average", "Sum", "SampleCount", "Maximum", "Minimum"},
+			Usage:     `Comma separated list of AWS Cloudwatch Status Ex: "Average, Sum"`,
+			Value:     &plugin.StatsList,
+		},
+		&sensu.PluginConfigOption{
 			Path:      "metric",
 			Argument:  "metric",
 			Shorthand: "M",
 			Default:   "",
 			Usage:     "Cloudwatch Metric Name",
 			Value:     &plugin.MetricName,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "preset",
+			Argument:  "preset",
+			Shorthand: "P",
+			Default:   "None",
+			Usage:     "Preset Name",
+			Value:     &plugin.PresetName,
 		},
 		&sensu.PluginConfigOption{
 			Path:      "max-pages",
@@ -133,11 +162,9 @@ var (
 			Value:     &plugin.DryRun,
 		},
 	}
-	// Setup regexp for use with toSnakeCase
-	matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
-	matchAllCap   = regexp.MustCompile("([a-z0-9])([A-Z])")
 	// Keyed list of metricConfig lookup table
-	metricConfig = make(map[string]MetricLabel)
+	// TODO: setup json config
+	metricConfig = make(map[string]MetricConfig)
 )
 
 func init() {
@@ -150,12 +177,13 @@ func main() {
 	check.Execute()
 }
 
+/* TODO: setup json config
 func buildConfigKey(m types.MetricStat) string {
 	return strings.ToLower(*m.Metric.Namespace + "::" + *m.Metric.MetricName + "::" + *m.Stat)
 	return ""
 }
 
-func (m MetricLabel) buildConfigKey() string {
+func (m MetricConfig) buildConfigKey() string {
 	if len(m.Namespace) > 0 && len(m.MetricName) > 0 && len(m.Stat) > 0 {
 		return strings.ToLower(m.Namespace + "::" + m.MetricName + "::" + m.Stat)
 	} else {
@@ -164,9 +192,9 @@ func (m MetricLabel) buildConfigKey() string {
 	}
 }
 
-func buildMetricLabels(jsonBlob []byte) (map[string]MetricLabel, error) {
-	objs := []MetricLabel{}
-	metricLabels := make(map[string]MetricLabel)
+func buildMetricConfig(jsonBlob []byte) (map[string]MetricConfig, error) {
+	objs := []MetricConfig{}
+	metricConfig := make(map[string]MetricConfig)
 	err := json.Unmarshal(jsonBlob, &objs)
 	for _, o := range objs {
 		if len(o.Namespace) == 0 {
@@ -180,19 +208,14 @@ func buildMetricLabels(jsonBlob []byte) (map[string]MetricLabel, error) {
 		}
 		key := o.buildConfigKey()
 		if len(key) > 0 {
-			metricLabels[key] = o
+			metricConfig[key] = o
 		} else {
 			return nil, err
 		}
 	}
-	return metricLabels, err
+	return metricConfig, err
 }
-
-func toSnakeCase(str string) string {
-	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
-	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
-	return strings.ToLower(snake)
-}
+*/
 
 func buildDimensionFilters(input []string) ([]types.DimensionFilter, error) {
 	output := []types.DimensionFilter{}
@@ -234,13 +257,32 @@ func checkArgs(event *v2.Event) (int, error) {
 	if len(plugin.Namespace) == 0 && len(plugin.MetricName) == 0 && !plugin.DryRun {
 		return sensu.CheckStateWarning, fmt.Errorf("Must select at least one of: --namespace, --metric, or --dry-run")
 	}
+
+	if len(strings.TrimSpace(plugin.PresetName)) > 0 {
+		if p, ok := presets.Presets[strings.TrimSpace(plugin.PresetName)]; ok {
+			plugin.Preset = p
+		} else {
+			keys := reflect.ValueOf(presets.Presets).MapKeys()
+			err := fmt.Errorf("Preset %v not defined\n Choose from: %v", plugin.PresetName, keys)
+			return sensu.CheckStateWarning, err
+		}
+	} else {
+		err := fmt.Errorf("No Preset selected")
+		return sensu.CheckStateWarning, err
+	}
+	if plugin.Preset == nil {
+		err := fmt.Errorf("No Preset selected")
+		return sensu.CheckStateWarning, err
+	}
+	/* TODO: setup json config
 	if len(plugin.ConfigString) > 0 {
-		result, err := buildMetricLabels([]byte(plugin.ConfigString))
+		result, err := buildMetricConfig([]byte(plugin.ConfigString))
 		if err != nil {
 			return sensu.CheckStateWarning, err
 		}
 		metricConfig = result
 	}
+	*/
 	return sensu.CheckStateOK, nil
 }
 
@@ -275,54 +317,21 @@ func GetMetricData(c context.Context, api ServiceAPI, input *cloudwatch.GetMetri
 }
 
 // Note: Use ServiceAPI interface definition to make function testable with mock API testing pattern
-func buildListMetricsInput() (*cloudwatch.ListMetricsInput, error) {
+func buildListMetricsInput(preset presets.ServicePreset) (*cloudwatch.ListMetricsInput, error) {
 	input := &cloudwatch.ListMetricsInput{}
 	if plugin.RecentlyActive {
 		input.RecentlyActive = "PT3H"
 	}
-	if len(plugin.Namespace) > 0 {
-		input.Namespace = &plugin.Namespace
+	if namespace := preset.GetNamespace(); len(namespace) > 0 {
+		input.Namespace = &namespace
 	}
-	if len(plugin.MetricName) > 0 {
-		input.MetricName = &plugin.MetricName
+	if metricName := preset.GetMetricName(); len(metricName) > 0 {
+		input.MetricName = &metricName
 	}
-	if len(plugin.DimensionFilters) > 0 {
-		input.Dimensions = plugin.DimensionFilters
+	if filters := preset.GetDimensionFilters(); len(filters) > 0 {
+		input.Dimensions = filters
 	}
 	return input, nil
-}
-
-func buildLabelBase(m types.Metric) string {
-	s := strings.Split(*m.Namespace, "/")
-	labelString := toSnakeCase(fmt.Sprintf("%v.%v.%v", toSnakeCase(s[0]), toSnakeCase(s[1]), toSnakeCase(*m.MetricName)))
-	return labelString
-}
-
-func buildMetricDataQueries(m types.Metric, stats []string) ([]types.MetricDataQuery, map[string]MetricQueryMap, error) {
-	dataQueries := []types.MetricDataQuery{}
-	queryMap := make(map[string]MetricQueryMap)
-
-	for _, stat := range stats {
-		id := uuid.New()
-		idString := "aws_" + strings.ReplaceAll(id.String(), "-", "_")
-		labelString := fmt.Sprintf("%v.%v", buildLabelBase(m), toSnakeCase(stat))
-		dataQuery := types.MetricDataQuery{
-			Id:    &idString,
-			Label: &labelString,
-			MetricStat: &types.MetricStat{
-				Metric: &m,
-				Period: aws.Int32(60 * int32(plugin.PeriodMinutes)),
-				Stat:   aws.String(stat),
-			},
-		}
-		queryMap[idString] = MetricQueryMap{
-			Id:     &idString,
-			Label:  &labelString,
-			Metric: &m,
-		}
-		dataQueries = append(dataQueries, dataQuery)
-	}
-	return dataQueries, queryMap, nil
 }
 
 func buildGetMetricDataInput(metricDataQueries []types.MetricDataQuery) (*cloudwatch.GetMetricDataInput, error) {
@@ -333,40 +342,27 @@ func buildGetMetricDataInput(metricDataQueries []types.MetricDataQuery) (*cloudw
 	return input, nil
 }
 
-func dimString(m *types.Metric) string {
-	if m == nil {
-		return ""
-	}
-	dimStrings := []string{}
-	if len(m.Dimensions) > 0 {
-		for _, d := range m.Dimensions {
-			dimStrings = append(dimStrings, fmt.Sprintf(`%v="%v"`, *d.Name, *d.Value))
-		}
-	}
-	dimStr := strings.Join(dimStrings, ",")
-	return dimStr
-}
-
 func checkFunction(client ServiceAPI) (int, error) {
+	var err error
+	var metricDataQueries []types.MetricDataQuery
 	numMetrics := 0
 	numResults := 0
 	numPages := 0
 	dataMessages := []types.MessageData{}
-	metricDataQueries := []types.MetricDataQuery{}
-	metricQueryMap := make(map[string]MetricQueryMap)
-	unusedQueryMap := make(map[string]MetricQueryMap)
-
 	outputStrings := []string{}
-	stats := []string{"SampleCount", "Average", "Maximum", "Minimum", "Sum"}
-
-	if plugin.Verbose {
-		fmt.Println("Metrics:")
+	if plugin.PresetName == "None" {
+		none := &presets.None{}
+		none.Namespace = plugin.Namespace
+		none.MetricName = plugin.MetricName
+		none.AddStats(plugin.StatsList)
+		none.AddDimensionFilters(plugin.DimensionFilters)
+		plugin.Preset = none
 	}
-
+	plugin.Preset.Init()
 	//List Metrics result page loop
 	for getList := true; getList && numPages < plugin.MaxPages; {
 		getList = false
-		input, err := buildListMetricsInput()
+		input, err := buildListMetricsInput(plugin.Preset)
 		if err != nil {
 			fmt.Println("Could not create ListMetricsInput")
 			return sensu.CheckStateCritical, nil
@@ -382,31 +378,42 @@ func checkFunction(client ServiceAPI) (int, error) {
 			numPages++
 			input.NextToken = listResult.NextToken
 		}
-		for _, m := range listResult.Metrics {
-			if plugin.Verbose {
-				fmt.Println("   Metric Name: " + *m.MetricName)
-				fmt.Println("   Namespace:   " + *m.Namespace)
-				fmt.Println("   Dimensions:")
-				for _, d := range m.Dimensions {
-					fmt.Println("      " + *d.Name + ": " + *d.Value)
-				}
 
-			}
-			numMetrics++
-			//Prepare data queries based on metric
-			metricQueries, metricMap, err := buildMetricDataQueries(m, stats)
-			if err != nil {
-				fmt.Println("Could not build DataQuery")
-				return sensu.CheckStateCritical, nil
-			}
-			// append data queries to global array
-			metricDataQueries = append(metricDataQueries, metricQueries...)
-			// add query metadata to global map query id map
-			for k, v := range metricMap {
-				metricQueryMap[k] = v
-				unusedQueryMap[k] = v
-			}
+		plugin.Preset.AddMetrics(listResult.Metrics)
+
+		numMetrics += len(listResult.Metrics)
+
+	}
+
+	numPages++
+	if plugin.Verbose {
+		fmt.Println("Found " + strconv.Itoa(numMetrics) + " metrics")
+		fmt.Println("Result Pages " + strconv.Itoa(numPages))
+		fmt.Println("")
+
+	}
+
+	metricDataQueries, err = plugin.Preset.BuildMetricDataQueries(int32(plugin.PeriodMinutes))
+	if err != nil {
+		fmt.Println("Could not build DataQuery")
+		return sensu.CheckStateCritical, nil
+	}
+
+	metricQueryMap := make(map[string]MetricQueryMap)
+	unusedQueryMap := make(map[string]MetricQueryMap)
+
+	for _, d := range metricDataQueries {
+		idString := *d.Id
+		qMap := MetricQueryMap{
+			Id:         *d.Id,
+			Label:      *d.Label,
+			Metric:     d.MetricStat.Metric,
+			MetricName: *d.MetricStat.Metric.MetricName,
+			Namespace:  *d.MetricStat.Metric.Namespace,
+			Dimensions: d.MetricStat.Metric.Dimensions,
 		}
+		metricQueryMap[idString] = qMap
+		unusedQueryMap[idString] = qMap
 	}
 
 	//Prepare the GetMetricData loop
@@ -426,14 +433,16 @@ func checkFunction(client ServiceAPI) (int, error) {
 		i = j + 1
 
 		if plugin.DryRun {
-			for _, q := range dataQuerySlice {
-				m := metricQueryMap[*q.Id].Metric
-				if m == nil {
-					fmt.Printf("Could not look up MetricQuery: %v\n", *q.Id)
+			for _, d := range dataQuerySlice {
+				q, ok := metricQueryMap[*d.Id]
+				if !ok {
+					fmt.Printf("Could not look up MetricQuery: %v\n", *d.Id)
 					return sensu.CheckStateCritical, nil
 				}
-				delete(unusedQueryMap, *q.Id)
-				outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", *q.Label, *m.Namespace, *m.MetricName, dimString(m)))
+				delete(unusedQueryMap, *d.Id)
+				outputStrings = append(outputStrings,
+					fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v",
+						q.Label, q.Namespace, q.MetricName, common.DimString(q.Dimensions, plugin.AWSRegion)))
 
 			}
 		} else {
@@ -446,18 +455,26 @@ func checkFunction(client ServiceAPI) (int, error) {
 				fmt.Printf("GetMetricData result too long")
 				return sensu.CheckStateCritical, nil
 			}
+			if len(dataResult.Messages) > 0 {
+				fmt.Printf("GetMetricData has DataMessage: %v\n", dataResult.Messages)
+				dataMessages = append(dataMessages, dataResult.Messages...)
+			}
 			for _, d := range dataResult.MetricDataResults {
 				numResults++
-				m := metricQueryMap[*d.Id].Metric
-				if m == nil {
+				q, ok := metricQueryMap[*d.Id]
+				if !ok {
 					fmt.Printf("Could not look up MetricQuery: %v\n", *d.Id)
 					return sensu.CheckStateCritical, nil
 				}
 				if len(d.Timestamps) > 0 {
 					delete(unusedQueryMap, *d.Id)
-					outputStrings = append(outputStrings, fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v", *d.Label, *m.Namespace, *m.MetricName, dimString(m)))
+					//outputStrings = append(outputStrings,
+					//	fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v",
+					//		q.Label, q.Namespace, q.MetricName, common.DimString(q.Dimensions, plugin.AWSRegion)))
 					for i := range d.Timestamps {
-						outputStrings = append(outputStrings, fmt.Sprintf("%v{%v} %v %v", *d.Label, dimString(m), d.Values[i], d.Timestamps[i].Unix()))
+						outputStrings = append(outputStrings,
+							fmt.Sprintf("%v{%v} %v %v",
+								q.Label, common.DimString(q.Dimensions, plugin.AWSRegion), d.Values[i], d.Timestamps[i].Unix()))
 					}
 				}
 			}
@@ -474,17 +491,7 @@ func checkFunction(client ServiceAPI) (int, error) {
 				}
 				fmt.Println("")
 			}
-			if len(dataResult.Messages) > 0 {
-				dataMessages = append(dataMessages, dataResult.Messages...)
-			}
 		}
-
-	}
-	numPages++
-	if plugin.Verbose {
-		fmt.Println("Found " + strconv.Itoa(numMetrics) + " metrics")
-		fmt.Println("Result Pages " + strconv.Itoa(numPages))
-		fmt.Println("")
 
 	}
 	warnFlag := false
@@ -514,7 +521,8 @@ func checkFunction(client ServiceAPI) (int, error) {
 			fmt.Printf("  MetricDataQueries with no results:\n")
 
 			for _, q := range unusedQueryMap {
-				fmt.Printf("    Label: %v\n      Namespace:%v MetricName:%v Dimensions:%v\n", *q.Label, *q.Metric.Namespace, *q.Metric.MetricName, dimString(q.Metric))
+				fmt.Printf("    Label: %v\n      Namespace:%v MetricName:%v Dimensions:%v\n",
+					q.Label, q.Namespace, q.MetricName, common.DimString(q.Dimensions, plugin.AWSRegion))
 			}
 		}
 	}

@@ -11,13 +11,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
-	"github.com/stretchr/testify/assert"
+	"github.com/sensu/sensu-cloudwatch-check/common"
 )
 
 // Create mockService Object to use in testing.
 // FIXME: replace s3 specific items with correct AWS service items
 var (
-	nextToken = false
+	nextToken   = false
+	enableQuiet = true
 )
 
 type mockService struct {
@@ -83,6 +84,10 @@ func (m mockService) GetMetricData(ctx context.Context,
 				Code:  aws.String("400"),
 				Value: aws.String("test message"),
 			},
+			types.MessageData{
+				Code:  aws.String("400"),
+				Value: aws.String("test message"),
+			},
 		}
 	}
 	return output, nil
@@ -92,9 +97,11 @@ func quiet() func() {
 	null, _ := os.Open(os.DevNull)
 	sout := os.Stdout
 	serr := os.Stderr
-	os.Stdout = null
-	os.Stderr = null
-	log.SetOutput(null)
+	if enableQuiet {
+		os.Stdout = null
+		os.Stderr = null
+		log.SetOutput(null)
+	}
 	return func() {
 		defer null.Close()
 		os.Stdout = sout
@@ -112,7 +119,7 @@ func cleanPluginValues() {
 	plugin.Namespace = ""
 	plugin.MaxPages = 0
 	plugin.PeriodMinutes = 0
-
+	plugin.PresetName = ""
 }
 
 func TestGetMetricData(t *testing.T) {
@@ -169,15 +176,17 @@ func TestGetMetricData(t *testing.T) {
 	}
 	cleanPluginValues()
 }
-func TestBuildMetricLabels(t *testing.T) {
+
+/* TODO: setup json config
+func TestBuildMetricConfig(t *testing.T) {
 	assert := assert.New(t)
-	jsonStr := []byte(`[{"label": "aws.test.label", "namespace" : "AWS/TEST", "metric-name": "Test", "stat" : "Average" }]`)
+	jsonStr := []byte(`[{"measaurement": "aws.test.measurement", "namespace" : "AWS/TEST", "metric-name": "Test", "stats" : ["Average","SampleCount"] }]`)
 	key := "aws/test::test::average"
-	result, err := buildMetricLabels(jsonStr)
+	result, err := buildMetricConfig(jsonStr)
 	assert.NoError(err)
 	assert.NotNil(result[key])
 }
-
+*/
 func TestToSnakeCase(t *testing.T) {
 	defer quiet()()
 	tests := []struct {
@@ -195,7 +204,7 @@ func TestToSnakeCase(t *testing.T) {
 		{"ID0Value", "id0_value"},
 	}
 	for _, test := range tests {
-		have := toSnakeCase(test.input)
+		have := common.ToSnakeCase(test.input)
 		if have != test.want {
 			t.Errorf("input=%q:\nhave: %q\nwant: %q", test.input, have, test.want)
 		}
@@ -204,6 +213,16 @@ func TestToSnakeCase(t *testing.T) {
 func TestCheckArgs(t *testing.T) {
 	defer quiet()()
 	cleanPluginValues()
+	t.Run("CheckArgs", func(t *testing.T) {
+		state, err := checkArgs(nil)
+		if err == nil {
+			t.Fatalf("expect error, got %v", err)
+		}
+		if state != 1 {
+			t.Errorf("expect state: %v, got %v", 1, state)
+		}
+	})
+	plugin.PresetName = "None"
 	plugin.Verbose = true
 	t.Run("CheckArgs", func(t *testing.T) {
 		state, err := checkArgs(nil)
@@ -250,6 +269,7 @@ func TestCheckArgs(t *testing.T) {
 func TestCheckFunction(t *testing.T) {
 	defer quiet()()
 	cleanPluginValues()
+	plugin.PresetName = "None"
 	plugin.RecentlyActive = true
 	plugin.MetricName = "test"
 	plugin.Namespace = "test"
@@ -282,7 +302,7 @@ func TestCheckFunction(t *testing.T) {
 			client:          mockService{},
 			maxPages:        2,
 			nextToken:       true,
-			expectedState:   1,
+			expectedState:   0,
 			includeMessages: true,
 			expectedId:      "test",
 		},
@@ -310,6 +330,7 @@ func TestCheckFunction(t *testing.T) {
 func TestCheckFunctionDryRun(t *testing.T) {
 	defer quiet()()
 	cleanPluginValues()
+	plugin.PresetName = "None"
 	plugin.DryRun = true
 	plugin.RecentlyActive = true
 	plugin.MetricName = "test"
