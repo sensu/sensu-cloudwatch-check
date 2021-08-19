@@ -31,11 +31,11 @@ func (p *None) AddMetrics(metrics []types.Metric) error {
 	return nil
 }
 
-func (p *None) AddDimensionFilters(filters []types.DimensionFilter) {
+func (p *None) AddDimensionFilters(filters []types.DimensionFilter) error {
 	for _, f := range filters {
 		p.DimensionFilters = append(p.DimensionFilters, f)
 	}
-	return
+	return nil
 }
 
 func (p *None) AddStats(stats []string) {
@@ -59,6 +59,11 @@ func (p *None) GetNamespace() string {
 
 func (p *None) GetMetricName() string {
 	return p.MetricName
+}
+
+func (p *None) SetMetricName(name string) error {
+	p.MetricName = name
+	return nil
 }
 
 func (p *None) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, error) {

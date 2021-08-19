@@ -19,7 +19,9 @@ type ServicePreset interface {
 	GetDescription() string
 	GetNamespace() string
 	GetMetricName() string
+	SetMetricName(name string) error
 	GetDimensionFilters() []types.DimensionFilter
+	AddDimensionFilters(filters []types.DimensionFilter) error
 	Init(verbose bool) error
 }
 

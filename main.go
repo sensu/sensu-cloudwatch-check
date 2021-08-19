@@ -344,11 +344,11 @@ func checkFunction(client ServiceAPI) (int, error) {
 	if plugin.PresetName == "None" {
 		none := &presets.None{}
 		none.Namespace = plugin.Namespace
-		none.MetricName = plugin.MetricName
 		none.AddStats(plugin.StatsList)
-		none.AddDimensionFilters(plugin.DimensionFilters)
 		plugin.Preset = none
 	}
+	plugin.Preset.AddDimensionFilters(plugin.DimensionFilters)
+	plugin.Preset.SetMetricName(plugin.MetricName)
 	plugin.Preset.Init(false)
 	//List Metrics result page loop
 	for getList := true; getList && numPages < plugin.MaxPages; {

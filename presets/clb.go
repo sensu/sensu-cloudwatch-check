@@ -23,11 +23,11 @@ type CLB struct {
 	Name              string
 }
 
-func (p *CLB) AddDimensionFilters(filters []types.DimensionFilter) {
+func (p *CLB) AddDimensionFilters(filters []types.DimensionFilter) error {
 	for _, f := range filters {
 		p.DimensionFilters = append(p.DimensionFilters, f)
 	}
-	return
+	return nil
 }
 
 func (p *CLB) AddStats(stats []string) {
@@ -44,8 +44,13 @@ func (p *CLB) GetDimensionFilters() []types.DimensionFilter {
 func (p *CLB) GetNamespace() string {
 	return p.Namespace
 }
+
 func (p *CLB) GetMetricName() string {
 	return ""
+}
+
+func (p *CLB) SetMetricName(name string) error {
+	return nil
 }
 
 func (p *CLB) GetDescription() string {
