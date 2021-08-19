@@ -39,8 +39,8 @@ func (p *None) AddDimensionFilters(filters []types.DimensionFilter) error {
 }
 
 func (p *None) AddStats(stats []string) {
-	for _, s := range stats {
-		p.Stats = append(p.Stats, s)
+	for i, _ := range stats {
+		p.Stats = append(p.Stats, strings.TrimSpace(stats[i]))
 	}
 	return
 }
