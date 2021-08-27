@@ -9,8 +9,19 @@ var (
 )
 
 func init() {
-	Presets["None"] = &None{Description: "No Service Presets Active, use cmdline --namespace --metric --dimension-filters to tailer cloudwatch results"}
-	Presets["CLB"] = &CLB{Description: "Preset Metrics for AWS Classic Load Balancer"}
+	Presets["None"] = &None{ServicePresetStruct: ServicePresetStruct{Description: "No Service Presets Active, use cmdline --namespace --metric --dimension-filters to tailer cloudwatch results"}}
+	Presets["CLB"] = &CLB{ServicePresetStruct: ServicePresetStruct{Description: "Preset Metrics for AWS Classic Load Balancer"}}
+}
+
+type ServicePresetStruct struct {
+	Metrics           []types.Metric
+	DimensionFilters  []types.DimensionFilter
+	Namespace         string
+	Description       string
+	Name              string
+	configMap         map[string][]StatConfig
+	measurementString string
+	verbose           bool
 }
 
 type ServicePreset interface {
@@ -20,6 +31,7 @@ type ServicePreset interface {
 	GetNamespace() string
 	GetMetricName() string
 	SetMetricName(name string) error
+	SetMeasurementString(name string) error
 	GetDimensionFilters() []types.DimensionFilter
 	AddDimensionFilters(filters []types.DimensionFilter) error
 	Init(verbose bool) error

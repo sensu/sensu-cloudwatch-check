@@ -65,7 +65,7 @@ var (
 	//initialize Sensu plugin Config object
 	plugin = Config{
 		PluginConfig: sensu.PluginConfig{
-			Name:     "Sensu Cloudwatch Check",
+			Name:     "sensu-cloudwatch-check",
 			Short:    "Sensu Cloudwatch Check",
 			Keyspace: "sensu.io/plugins/sensu-cloudwatch-check/config",
 		},

@@ -12,15 +12,7 @@ import (
 )
 
 type CLB struct {
-	Metrics           []types.Metric
-	Stats             []string
-	DimensionFilters  []types.DimensionFilter
-	Namespace         string
-	MeasurementString string
-	configMap         map[string][]StatConfig
-	verbose           bool
-	Description       string
-	Name              string
+	ServicePresetStruct
 }
 
 func (p *CLB) AddDimensionFilters(filters []types.DimensionFilter) error {
@@ -30,11 +22,22 @@ func (p *CLB) AddDimensionFilters(filters []types.DimensionFilter) error {
 	return nil
 }
 
-func (p *CLB) AddStats(stats []string) {
-	for _, s := range stats {
-		p.Stats = append(p.Stats, s)
+func (p *CLB) SetMeasurementString(mstring string) error {
+	p.measurementString = mstring
+	measurementConfig := MeasurementJSON{}
+	if err := json.Unmarshal([]byte(p.measurementString), &measurementConfig); err != nil {
+		return err
 	}
-	return
+	p.configMap = make(map[string][]StatConfig)
+	for _, metric := range measurementConfig.Metrics {
+		p.configMap[metric.MetricName] = []StatConfig{}
+		for _, item := range metric.Config {
+			p.configMap[metric.MetricName] = append(p.configMap[metric.MetricName], item)
+		}
+
+	}
+
+	return nil
 }
 
 func (p *CLB) GetDimensionFilters() []types.DimensionFilter {
@@ -117,7 +120,6 @@ func (p *CLB) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, err
 func (p *CLB) Init(verbose bool) error {
 	p.verbose = verbose
 	p.Namespace = "AWS/ELB"
-	p.Stats = []string{"Average"}
 	if filters, err := common.BuildDimensionFilters([]string{
 		"LoadBalancerName", "AvailabilityZone"}); err == nil {
 		p.DimensionFilters = filters
@@ -127,7 +129,7 @@ func (p *CLB) Init(verbose bool) error {
 
 	// JSON Config String developed on 2021-08-18 from AWS Cloudwatch documentation
 	//  Ref: https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-cloudwatch-metrics.html#loadbalancing-metrics-clb
-	p.MeasurementString = `{"metrics" : 
+	measurementString := `{"metrics" : 
                                   [
 				   {"metric":"HTTPCode_ELB_4XX" , "config": 
 				      [
@@ -209,17 +211,6 @@ func (p *CLB) Init(verbose bool) error {
 			          ]
 		     }
 		     `
-	measurementConfig := MeasurementJSON{}
-	if err := json.Unmarshal([]byte(p.MeasurementString), &measurementConfig); err != nil {
-		return err
-	}
-	p.configMap = make(map[string][]StatConfig)
-	for _, metric := range measurementConfig.Metrics {
-		p.configMap[metric.MetricName] = []StatConfig{}
-		for _, item := range metric.Config {
-			p.configMap[metric.MetricName] = append(p.configMap[metric.MetricName], item)
-		}
-
-	}
+	p.SetMeasurementString(measurementString)
 	return nil
 }

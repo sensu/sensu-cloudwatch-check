@@ -1,6 +1,7 @@
 package presets
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -11,13 +12,9 @@ import (
 )
 
 type None struct {
-	Metrics           []types.Metric
-	Stats             []string
-	DimensionFilters  []types.DimensionFilter
-	Namespace         string
-	MetricName        string
-	MeasurementString string
-	Description       string
+	ServicePresetStruct
+	MetricName string
+	Stats      []string
 }
 
 func (p *None) Init(verbose bool) error {
@@ -63,6 +60,24 @@ func (p *None) GetMetricName() string {
 
 func (p *None) SetMetricName(name string) error {
 	p.MetricName = name
+	return nil
+}
+
+func (p *None) SetMeasurementString(mstring string) error {
+	p.measurementString = mstring
+	measurementConfig := MeasurementJSON{}
+	if err := json.Unmarshal([]byte(p.measurementString), &measurementConfig); err != nil {
+		return err
+	}
+	p.configMap = make(map[string][]StatConfig)
+	for _, metric := range measurementConfig.Metrics {
+		p.configMap[metric.MetricName] = []StatConfig{}
+		for _, item := range metric.Config {
+			p.configMap[metric.MetricName] = append(p.configMap[metric.MetricName], item)
+		}
+
+	}
+
 	return nil
 }
 
