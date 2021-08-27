@@ -68,6 +68,13 @@ func (p *Preset) AddDimensionFilters(filters []types.DimensionFilter) error {
 	return nil
 }
 
+func (p *Preset) GetMeasurementString(pretty bool) string {
+	measurementConfig := MeasurementJSON{}
+	measurementConfig.Namespace = p.Namespace
+	measurementConfig.MetricName = p.MetricName
+	return ""
+}
+
 func (p *Preset) SetMeasurementString(mstring string) error {
 	p.measurementString = mstring
 	measurementConfig := MeasurementJSON{}
