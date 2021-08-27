@@ -64,7 +64,7 @@ func TestNoneBuildMetricDataQueries(t *testing.T) {
 		}
 		metrics = append(metrics, m)
 	}
-	err = none.Preset.AddMetrics(metrics)
+	err = none.AddMetrics(metrics)
 	assert.NoError(err)
 	none.BuildMetricDataQueries(int32(1))
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/google/uuid"
+	"github.com/sensu/sensu-cloudwatch-check/common"
 )
 
 var (
@@ -52,8 +53,11 @@ type MetricConfig struct {
 	MetricName string       `json:"metric"`
 	Config     []StatConfig `json:"config"`
 }
+
 type MeasurementJSON struct {
-	Metrics []MetricConfig `json:"metrics"`
+	Namespace        string         `json:"namespace"`
+	DimensionFilters []string       `json:"dimension-filters"`
+	Metrics          []MetricConfig `json:"metrics"`
 }
 
 func (p *Preset) AddDimensionFilters(filters []types.DimensionFilter) error {
@@ -68,6 +72,16 @@ func (p *Preset) SetMeasurementString(mstring string) error {
 	measurementConfig := MeasurementJSON{}
 	if err := json.Unmarshal([]byte(p.measurementString), &measurementConfig); err != nil {
 		return err
+	}
+	if len(measurementConfig.Namespace) > 0 {
+		p.Namespace = measurementConfig.Namespace
+	}
+	if len(measurementConfig.DimensionFilters) > 0 {
+		if dimensionFilters, err := common.BuildDimensionFilters(measurementConfig.DimensionFilters); err == nil {
+			p.AddDimensionFilters(dimensionFilters)
+		} else {
+			return err
+		}
 	}
 	p.configMap = make(map[string][]StatConfig)
 	for _, metric := range measurementConfig.Metrics {

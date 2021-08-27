@@ -13,6 +13,13 @@ func TestCLBInit(t *testing.T) {
 	elb := &CLB{}
 	err := elb.Init(true)
 	assert.NoError(err)
+	assert.Equal("AWS/ELB", elb.Namespace)
+	assert.Equal(2, len(elb.DimensionFilters))
+	allowed := []string{"LoadBalancerName", "AvailabilityZone"}
+	for _, d := range elb.DimensionFilters {
+		assert.Contains(allowed, *d.Name)
+		assert.Nil(d.Value)
+	}
 }
 
 func TestCLBAddMetrics(t *testing.T) {
