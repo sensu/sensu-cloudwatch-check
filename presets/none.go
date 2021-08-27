@@ -1,6 +1,7 @@
 package presets
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -20,6 +21,62 @@ func (p *None) Init(verbose bool) error {
 	if p.verbose {
 		fmt.Println("None::Init Setting up none preset")
 	}
+	return nil
+}
+
+func (p *None) GetMeasurementString(pretty bool) (string, error) {
+	if err := p.BuildMeasurementString(); err != nil {
+		return "", err
+	}
+	if err := p.BuildMeasurementConfig(); err != nil {
+		return "", err
+	}
+	return p.Preset.GetMeasurementString(pretty)
+}
+
+func (p *None) BuildMeasurementString() error {
+	if p.verbose {
+		fmt.Println("None::BuildMeasurementString")
+	}
+	if len(p.Namespace) == 0 {
+		return fmt.Errorf("Namespace is not set")
+	}
+	if len(p.Stats) == 0 {
+		return fmt.Errorf("No stats set")
+	}
+	if len(p.Metrics) == 0 {
+		return fmt.Errorf("No metrics set")
+	}
+	measurementConfig := MeasurementJSON{}
+	measurementConfig.Measurements = []MeasurementConfig{}
+	measurementConfig.Namespace = p.Namespace
+	measurementConfig.MetricName = p.MetricName
+	for i, _ := range p.Metrics {
+		config := MeasurementConfig{
+			MetricName: *p.Metrics[i].MetricName,
+			Config:     []StatConfig{},
+		}
+
+		for j, _ := range p.Stats {
+			labelString := fmt.Sprintf("%v.%v", common.BuildLabelBase(p.Metrics[i]), common.ToSnakeCase(p.Stats[j]))
+			s := StatConfig{
+				Stat:        p.Stats[j],
+				Measurement: labelString,
+			}
+			config.Config = append(config.Config, s)
+		}
+
+		measurementConfig.Measurements = append(measurementConfig.Measurements, config)
+	}
+
+	if output, err := json.Marshal(measurementConfig); err != nil {
+		return err
+	} else {
+		p.measurementString = string(output)
+		return nil
+
+	}
+
 	return nil
 }
 

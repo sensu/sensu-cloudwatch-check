@@ -13,15 +13,6 @@ func (p *CLB) Init(verbose bool) error {
 		fmt.Println("CLB::Init Setting up clb preset")
 	}
 
-	/*
-		p.Namespace = "AWS/ELB"
-		if filters, err := common.BuildDimensionFilters([]string{
-			"LoadBalancerName", "AvailabilityZone"}); err == nil {
-			p.DimensionFilters = filters
-		} else {
-			return err
-		}
-	*/
 	// JSON Config String developed on 2021-08-18 from AWS Cloudwatch documentation
 	//  Ref: https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-cloudwatch-metrics.html#loadbalancing-metrics-clb
 	measurementString := `{ "namespace" : "AWS/ELB",
@@ -108,6 +99,8 @@ func (p *CLB) Init(verbose bool) error {
 			          ]
 		     }
 		     `
-	p.SetMeasurementString(measurementString)
+	p.measurementString = measurementString
+	p.BuildMeasurementConfig()
+
 	return nil
 }

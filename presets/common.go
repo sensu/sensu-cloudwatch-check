@@ -39,7 +39,8 @@ type PresetInterface interface {
 	GetNamespace() string
 	GetMetricName() string
 	SetMetricName(name string) error
-	SetMeasurementString(name string) error
+	BuildMeasurementConfig() error
+	GetMeasurementString(pretty bool) (string, error)
 	GetDimensionFilters() []types.DimensionFilter
 	AddDimensionFilters(filters []types.DimensionFilter) error
 	Init(verbose bool) error
@@ -55,10 +56,10 @@ type MeasurementConfig struct {
 }
 
 type MeasurementJSON struct {
-	Namespace        string              `json:"namespace",omitempty`
-	MetricName       string              `json:"metric",omitempty`
-	DimensionFilters []string            `json:"dimension-filters",omitempty`
-	Measurements     []MeasurementConfig `json:"measurements",omitempty`
+	Namespace        string              `json:"namespace,omitempty"`
+	MetricName       string              `json:"metric,omitempty"`
+	DimensionFilters []string            `json:"dimension-filters,omitempty"`
+	Measurements     []MeasurementConfig `json:"measurements,omitempty"`
 }
 
 func (p *Preset) AddDimensionFilters(filters []types.DimensionFilter) error {
@@ -68,15 +69,32 @@ func (p *Preset) AddDimensionFilters(filters []types.DimensionFilter) error {
 	return nil
 }
 
-func (p *Preset) GetMeasurementString(pretty bool) string {
+func (p *Preset) GetMeasurementString(pretty bool) (string, error) {
 	measurementConfig := MeasurementJSON{}
+	measurementConfig.Measurements = []MeasurementConfig{}
 	measurementConfig.Namespace = p.Namespace
 	measurementConfig.MetricName = p.MetricName
-	return ""
+	for metricName := range p.configMap {
+		config := MeasurementConfig{
+			MetricName: metricName,
+			Config:     p.configMap[metricName],
+		}
+		measurementConfig.Measurements = append(measurementConfig.Measurements, config)
+	}
+	prefix := ""
+	indent := ""
+	if pretty {
+		indent = "  "
+	}
+	if output, err := json.MarshalIndent(measurementConfig, prefix, indent); err != nil {
+		return "", err
+	} else {
+		return string(output), nil
+
+	}
 }
 
-func (p *Preset) SetMeasurementString(mstring string) error {
-	p.measurementString = mstring
+func (p *Preset) BuildMeasurementConfig() error {
 	measurementConfig := MeasurementJSON{}
 	if err := json.Unmarshal([]byte(p.measurementString), &measurementConfig); err != nil {
 		return err

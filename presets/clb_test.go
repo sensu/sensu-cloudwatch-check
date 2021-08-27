@@ -22,6 +22,18 @@ func TestCLBInit(t *testing.T) {
 	}
 }
 
+func TestCLBGetMeasurementString(t *testing.T) {
+	defer quiet()()
+	assert := assert.New(t)
+	elb := &CLB{}
+	err := elb.Init(true)
+	assert.NoError(err)
+	output, err := elb.GetMeasurementString(false)
+	assert.NoError(err)
+	assert.Greater(len(output), 30)
+
+}
+
 func TestCLBAddMetrics(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
