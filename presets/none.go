@@ -51,6 +51,15 @@ func (p *None) BuildMeasurementString() error {
 	measurementConfig.Measurements = []MeasurementConfig{}
 	measurementConfig.Namespace = p.Namespace
 	measurementConfig.MetricName = p.MetricName
+	dimStrings := []string{}
+	for _, d := range p.DimensionFilters {
+		output := strings.TrimSpace(*d.Name)
+		if d.Value != nil {
+			output += "=" + strings.TrimSpace(*d.Value)
+		}
+		dimStrings = append(dimStrings, output)
+	}
+	measurementConfig.DimensionFilters = dimStrings
 	for i, _ := range p.Metrics {
 		config := MeasurementConfig{
 			MetricName: *p.Metrics[i].MetricName,

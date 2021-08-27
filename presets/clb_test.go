@@ -1,6 +1,7 @@
 package presets
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
@@ -20,18 +21,6 @@ func TestCLBInit(t *testing.T) {
 		assert.Contains(allowed, *d.Name)
 		assert.Nil(d.Value)
 	}
-}
-
-func TestCLBGetMeasurementString(t *testing.T) {
-	defer quiet()()
-	assert := assert.New(t)
-	elb := &CLB{}
-	err := elb.Init(true)
-	assert.NoError(err)
-	output, err := elb.GetMeasurementString(false)
-	assert.NoError(err)
-	assert.Greater(len(output), 30)
-
 }
 
 func TestCLBAddMetrics(t *testing.T) {
@@ -111,4 +100,17 @@ func TestCLBBuildMetricDataQueries(t *testing.T) {
 	err = elb.AddMetrics(metrics)
 	assert.NoError(err)
 	elb.BuildMetricDataQueries(int32(1))
+}
+
+func TestCLBGetMeasurementString(t *testing.T) {
+	defer quiet()()
+	assert := assert.New(t)
+	elb := &CLB{}
+	err := elb.Init(true)
+	assert.NoError(err)
+	output, err := elb.GetMeasurementString(true)
+	assert.NoError(err)
+	assert.Greater(len(output), 30)
+	fmt.Println(output)
+
 }
