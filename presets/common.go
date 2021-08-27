@@ -49,15 +49,16 @@ type StatConfig struct {
 	Stat        string `json:"stat"`
 	Measurement string `json:"measurement"`
 }
-type MetricConfig struct {
+type MeasurementConfig struct {
 	MetricName string       `json:"metric"`
 	Config     []StatConfig `json:"config"`
 }
 
 type MeasurementJSON struct {
-	Namespace        string         `json:"namespace"`
-	DimensionFilters []string       `json:"dimension-filters"`
-	Metrics          []MetricConfig `json:"metrics"`
+	Namespace        string              `json:"namespace",omitempty`
+	MetricName       string              `json:"metric",omitempty`
+	DimensionFilters []string            `json:"dimension-filters",omitempty`
+	Measurements     []MeasurementConfig `json:"measurements",omitempty`
 }
 
 func (p *Preset) AddDimensionFilters(filters []types.DimensionFilter) error {
@@ -84,10 +85,10 @@ func (p *Preset) SetMeasurementString(mstring string) error {
 		}
 	}
 	p.configMap = make(map[string][]StatConfig)
-	for _, metric := range measurementConfig.Metrics {
-		p.configMap[metric.MetricName] = []StatConfig{}
-		for _, item := range metric.Config {
-			p.configMap[metric.MetricName] = append(p.configMap[metric.MetricName], item)
+	for _, m := range measurementConfig.Measurements {
+		p.configMap[m.MetricName] = []StatConfig{}
+		for _, item := range m.Config {
+			p.configMap[m.MetricName] = append(p.configMap[m.MetricName], item)
 		}
 
 	}

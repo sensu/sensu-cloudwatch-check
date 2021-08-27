@@ -26,7 +26,7 @@ func (p *CLB) Init(verbose bool) error {
 	//  Ref: https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-cloudwatch-metrics.html#loadbalancing-metrics-clb
 	measurementString := `{ "namespace" : "AWS/ELB",
                                 "dimension-filters" : [ "LoadBalancerName", "AvailabilityZone" ],
-                                "metrics" : 
+                                "measurements" : 
                                   [
 				   {"metric":"HTTPCode_ELB_4XX" , "config": 
 				      [
