@@ -37,7 +37,7 @@ type Config struct {
 	PeriodMinutes          int
 	StatsList              []string
 	PresetName             string
-	Preset                 presets.ServicePreset
+	Preset                 presets.PresetInterface
 	// TODO: replace dryrun HELP with something useful
 	ServiceExplorer bool
 	// TODO: add support for json config
@@ -308,7 +308,7 @@ func GetMetricData(c context.Context, api ServiceAPI, input *cloudwatch.GetMetri
 }
 
 // Note: Use ServiceAPI interface definition to make function testable with mock API testing pattern
-func buildListMetricsInput(preset presets.ServicePreset) (*cloudwatch.ListMetricsInput, error) {
+func buildListMetricsInput(preset presets.PresetInterface) (*cloudwatch.ListMetricsInput, error) {
 	input := &cloudwatch.ListMetricsInput{}
 	if plugin.RecentlyActive {
 		input.RecentlyActive = "PT3H"
@@ -343,13 +343,14 @@ func checkFunction(client ServiceAPI) (int, error) {
 	outputStrings := []string{}
 	if plugin.PresetName == "None" {
 		none := &presets.None{}
+		none.Init(plugin.Verbose)
 		none.Namespace = plugin.Namespace
 		none.AddStats(plugin.StatsList)
 		plugin.Preset = none
 	}
 	plugin.Preset.AddDimensionFilters(plugin.DimensionFilters)
 	plugin.Preset.SetMetricName(plugin.MetricName)
-	plugin.Preset.Init(false)
+	plugin.Preset.Init(plugin.Verbose)
 	//List Metrics result page loop
 	for getList := true; getList && numPages < plugin.MaxPages; {
 		getList = false

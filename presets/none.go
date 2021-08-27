@@ -1,7 +1,6 @@
 package presets
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -12,76 +11,61 @@ import (
 )
 
 type None struct {
-	ServicePresetStruct
-	MetricName string
-	Stats      []string
+	Preset
+	Stats []string
 }
 
 func (p *None) Init(verbose bool) error {
-	return nil
-}
-
-func (p *None) AddMetrics(metrics []types.Metric) error {
-	for _, m := range metrics {
-		p.Metrics = append(p.Metrics, m)
+	p.verbose = verbose
+	if p.verbose {
+		fmt.Println("None::Init Setting up none preset")
 	}
-	return nil
-}
-
-func (p *None) AddDimensionFilters(filters []types.DimensionFilter) error {
-	for _, f := range filters {
-		p.DimensionFilters = append(p.DimensionFilters, f)
-	}
+	p.addMetricsFunc = p.AddMetrics
+	p.buildMetricDataQueriesFunc = p.BuildMetricDataQueries
+	p.setMetricNameFunc = p.SetMetricName
+	p.getMetricNameFunc = p.GetMetricName
 	return nil
 }
 
 func (p *None) AddStats(stats []string) {
+	if p.verbose {
+		fmt.Println("None::AddStats", stats)
+	}
 	for i, _ := range stats {
 		p.Stats = append(p.Stats, strings.TrimSpace(stats[i]))
 	}
 	return
 }
 
-func (p *None) GetDimensionFilters() []types.DimensionFilter {
-	return p.DimensionFilters
-}
-
-func (p *None) GetDescription() string {
-	return p.Description
-}
-
-func (p *None) GetNamespace() string {
-	return p.Namespace
-}
-
 func (p *None) GetMetricName() string {
+	if p.verbose {
+		fmt.Println("None::GetMetricName", p.MetricName)
+	}
 	return p.MetricName
 }
 
 func (p *None) SetMetricName(name string) error {
+	if p.verbose {
+		fmt.Println("None::SetMetricName", name)
+	}
 	p.MetricName = name
 	return nil
 }
 
-func (p *None) SetMeasurementString(mstring string) error {
-	p.measurementString = mstring
-	measurementConfig := MeasurementJSON{}
-	if err := json.Unmarshal([]byte(p.measurementString), &measurementConfig); err != nil {
-		return err
+func (p *None) AddMetrics(metrics []types.Metric) error {
+	if p.verbose {
+		fmt.Println("None::AddMetrics", len(metrics))
 	}
-	p.configMap = make(map[string][]StatConfig)
-	for _, metric := range measurementConfig.Metrics {
-		p.configMap[metric.MetricName] = []StatConfig{}
-		for _, item := range metric.Config {
-			p.configMap[metric.MetricName] = append(p.configMap[metric.MetricName], item)
-		}
-
+	for _, m := range metrics {
+		p.Metrics = append(p.Metrics, m)
 	}
-
 	return nil
 }
 
 func (p *None) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, error) {
+	if p.verbose {
+		fmt.Println("None::BuildMetricDataQueries")
+	}
 	dataQueries := []types.MetricDataQuery{}
 	for i, _ := range p.Metrics {
 		for j, _ := range p.Stats {
