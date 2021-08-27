@@ -38,6 +38,7 @@ type Config struct {
 	StatsList              []string
 	PresetName             string
 	Preset                 presets.PresetInterface
+	OutputConfig           bool
 	// TODO: replace dryrun HELP with something useful
 	ServiceExplorer bool
 	// TODO: add support for json config
@@ -72,16 +73,15 @@ var (
 	}
 	//initialize options list with custom options
 	options = []*sensu.PluginConfigOption{
-		/* TODO: Add support for json config
 		&sensu.PluginConfigOption{
-			Path:      "config",
-			Argument:  "config",
-			Shorthand: "c",
-			Default:   "",
-			Usage:     "Configuration JSON string",
-			Value:     &plugin.ConfigString,
+			Path:      "output-config",
+			Argument:  "output-config",
+			Shorthand: "o",
+			Default:   false,
+			Usage:     "Output measurement configuration JSON string",
+			Value:     &plugin.OutputConfig,
 		},
-		*/
+
 		&sensu.PluginConfigOption{
 			Path:     "recently-active",
 			Argument: "recently-active",
@@ -176,46 +176,6 @@ func main() {
 	check := sensu.NewGoCheck(&plugin.PluginConfig, options, checkArgs, executeCheck, false)
 	check.Execute()
 }
-
-/* TODO: setup json config
-func buildConfigKey(m types.MetricStat) string {
-	return strings.ToLower(*m.Metric.Namespace + "::" + *m.Metric.MetricName + "::" + *m.Stat)
-	return ""
-}
-
-func (m MetricConfig) buildConfigKey() string {
-	if len(m.Namespace) > 0 && len(m.MetricName) > 0 && len(m.Stat) > 0 {
-		return strings.ToLower(m.Namespace + "::" + m.MetricName + "::" + m.Stat)
-	} else {
-		fmt.Println(len(m.Namespace), len(m.MetricName), len(m.Stat))
-		return ""
-	}
-}
-
-func buildMetricConfig(jsonBlob []byte) (map[string]MetricConfig, error) {
-	objs := []MetricConfig{}
-	metricConfig := make(map[string]MetricConfig)
-	err := json.Unmarshal(jsonBlob, &objs)
-	for _, o := range objs {
-		if len(o.Namespace) == 0 {
-			o.Namespace = plugin.Namespace
-		}
-		if len(o.MetricName) == 0 {
-			o.MetricName = plugin.MetricName
-		}
-		if len(o.Stat) == 0 {
-			o.Stat = "Average"
-		}
-		key := o.buildConfigKey()
-		if len(key) > 0 {
-			metricConfig[key] = o
-		} else {
-			return nil, err
-		}
-	}
-	return metricConfig, err
-}
-*/
 
 func checkArgs(event *v2.Event) (int, error) {
 	// Check for valid AWS credentials
@@ -333,70 +293,12 @@ func buildGetMetricDataInput(metricDataQueries []types.MetricDataQuery) (*cloudw
 	return input, nil
 }
 
-func checkFunction(client ServiceAPI) (int, error) {
-	var err error
-	var metricDataQueries []types.MetricDataQuery
-	numMetrics := 0
-	numResults := 0
-	numPages := 0
-	dataMessages := []types.MessageData{}
-	outputStrings := []string{}
-	if plugin.PresetName == "None" {
-		none := &presets.None{}
-		none.Init(plugin.Verbose)
-		none.Namespace = plugin.Namespace
-		none.AddStats(plugin.StatsList)
-		plugin.Preset = none
-	}
-	plugin.Preset.AddDimensionFilters(plugin.DimensionFilters)
-	plugin.Preset.SetMetricName(plugin.MetricName)
-	plugin.Preset.Init(plugin.Verbose)
-	//List Metrics result page loop
-	for getList := true; getList && numPages < plugin.MaxPages; {
-		getList = false
-		input, err := buildListMetricsInput(plugin.Preset)
-		if err != nil {
-			fmt.Println("Could not create ListMetricsInput")
-			return sensu.CheckStateCritical, nil
-		}
-		listResult, err := GetMetricsList(context.TODO(), client, input)
-
-		if err != nil {
-			fmt.Println("Could not get metrics list")
-			return sensu.CheckStateCritical, nil
-		}
-		if listResult.NextToken != nil {
-			getList = true
-			numPages++
-			input.NextToken = listResult.NextToken
-		}
-
-		plugin.Preset.AddMetrics(listResult.Metrics)
-
-		numMetrics += len(listResult.Metrics)
-
-	}
-
-	numPages++
-	if plugin.Verbose {
-		fmt.Println("Found " + strconv.Itoa(numMetrics) + " metrics")
-		fmt.Println("Result Pages " + strconv.Itoa(numPages))
-		fmt.Println("")
-
-	}
-
-	metricDataQueries, err = plugin.Preset.BuildMetricDataQueries(int32(plugin.PeriodMinutes))
-	if err != nil {
-		fmt.Println("Could not build DataQuery")
-		return sensu.CheckStateCritical, nil
-	}
-	if len(metricDataQueries) == 0 {
-		fmt.Println("No metricDataQueries to process")
-		return sensu.CheckStateWarning, nil
-	}
-
+func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery) (int, error) {
 	metricQueryMap := make(map[string]MetricQueryMap)
 	unusedQueryMap := make(map[string]MetricQueryMap)
+	outputStrings := []string{}
+	dataMessages := []types.MessageData{}
+	numResults := 0
 
 	for _, d := range metricDataQueries {
 		idString := *d.Id
@@ -411,7 +313,6 @@ func checkFunction(client ServiceAPI) (int, error) {
 		metricQueryMap[idString] = qMap
 		unusedQueryMap[idString] = qMap
 	}
-
 	//Prepare the GetMetricData loop
 	i := 0
 	for i < len(metricDataQueries) {
@@ -491,11 +392,6 @@ func checkFunction(client ServiceAPI) (int, error) {
 
 	}
 	warnFlag := false
-	if numPages > plugin.MaxPages {
-		fmt.Printf("# Warning: max allowed ListMetrics result pages (%v) exceeded, either filter via --namespace or --metric option or increase --max-pages value",
-			plugin.MaxPages)
-		warnFlag = true
-	}
 	if len(dataMessages) > 0 {
 		fmt.Println("# Warning: Some calls to GetMetricData resulted in error messages")
 		for _, m := range dataMessages {
@@ -511,7 +407,7 @@ func checkFunction(client ServiceAPI) (int, error) {
 	}
 	if plugin.Verbose {
 		fmt.Println("Summary:")
-		fmt.Printf("  Number of Metrics: %v\n  MetricDataQueries: %v\n  QueryMaps: %v\n", numMetrics, len(metricDataQueries), len(metricQueryMap))
+		fmt.Printf("  MetricDataQueries: %v\n  QueryMaps: %v\n", len(metricDataQueries), len(metricQueryMap))
 		fmt.Printf("  Number of MetricDataResults: %v\n", numResults)
 		if len(unusedQueryMap) > 0 {
 			fmt.Printf("  MetricDataQueries with no results:\n")
@@ -521,6 +417,87 @@ func checkFunction(client ServiceAPI) (int, error) {
 					q.Label, q.Namespace, q.MetricName, common.DimString(q.Dimensions, plugin.AWSRegion))
 			}
 		}
+	}
+	return sensu.CheckStateOK, nil
+
+}
+
+func checkFunction(client ServiceAPI) (int, error) {
+	var err error
+	var metricDataQueries []types.MetricDataQuery
+	numMetrics := 0
+	numPages := 0
+	if plugin.PresetName == "None" {
+		none := &presets.None{}
+		none.Init(plugin.Verbose)
+		none.Namespace = plugin.Namespace
+		none.AddStats(plugin.StatsList)
+		plugin.Preset = none
+	}
+	plugin.Preset.AddDimensionFilters(plugin.DimensionFilters)
+	plugin.Preset.SetMetricName(plugin.MetricName)
+	plugin.Preset.Init(plugin.Verbose)
+	//List Metrics result page loop
+	for getList := true; getList && numPages < plugin.MaxPages; {
+		getList = false
+		input, err := buildListMetricsInput(plugin.Preset)
+		if err != nil {
+			fmt.Println("Could not create ListMetricsInput")
+			return sensu.CheckStateCritical, nil
+		}
+		listResult, err := GetMetricsList(context.TODO(), client, input)
+
+		if err != nil {
+			fmt.Println("Could not get metrics list")
+			return sensu.CheckStateCritical, nil
+		}
+		if listResult.NextToken != nil {
+			getList = true
+			numPages++
+			input.NextToken = listResult.NextToken
+		}
+
+		plugin.Preset.AddMetrics(listResult.Metrics)
+
+		numMetrics += len(listResult.Metrics)
+
+	}
+	numPages++
+	if plugin.Verbose {
+		fmt.Println("Found " + strconv.Itoa(numMetrics) + " metrics")
+		fmt.Println("Result Pages " + strconv.Itoa(numPages))
+		fmt.Println("")
+	}
+	if plugin.OutputConfig {
+		if output, err := plugin.Preset.GetMeasurementString(true); err != nil {
+			return sensu.CheckStateCritical, nil
+		} else {
+			if plugin.Verbose {
+				fmt.Println("Measurement Configuration:")
+			}
+			fmt.Println(output)
+		}
+	} else {
+		// Outputing Metrics
+		if numPages > plugin.MaxPages {
+			fmt.Printf("# Warning: max allowed ListMetrics result pages (%v) exceeded, either filter via --namespace or --metric option or increase --max-pages value",
+				plugin.MaxPages)
+			return sensu.CheckStateWarning, nil
+		}
+		metricDataQueries, err = plugin.Preset.BuildMetricDataQueries(int32(plugin.PeriodMinutes))
+		if err != nil {
+			fmt.Println("Could not build DataQuery")
+			return sensu.CheckStateCritical, nil
+		}
+		if len(metricDataQueries) == 0 {
+			fmt.Println("No metricDataQueries to process")
+			return sensu.CheckStateWarning, nil
+		}
+
+		if state, err := getData(client, metricDataQueries); state != sensu.CheckStateOK {
+			return state, err
+		}
+
 	}
 	return sensu.CheckStateOK, nil
 }

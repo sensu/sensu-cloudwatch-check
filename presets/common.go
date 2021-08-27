@@ -74,6 +74,16 @@ func (p *Preset) GetMeasurementString(pretty bool) (string, error) {
 	measurementConfig.Measurements = []MeasurementConfig{}
 	measurementConfig.Namespace = p.Namespace
 	measurementConfig.MetricName = p.MetricName
+	dimStrings := []string{}
+	for _, d := range p.DimensionFilters {
+		output := strings.TrimSpace(*d.Name)
+		if d.Value != nil {
+			output += "=" + strings.TrimSpace(*d.Value)
+		}
+		dimStrings = append(dimStrings, output)
+	}
+	measurementConfig.DimensionFilters = common.RemoveDuplicateStrings(dimStrings)
+
 	for metricName := range p.configMap {
 		config := MeasurementConfig{
 			MetricName: metricName,
