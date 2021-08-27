@@ -20,19 +20,15 @@ func init() {
 }
 
 type Preset struct {
-	Metrics                    []types.Metric
-	DimensionFilters           []types.DimensionFilter
-	Namespace                  string
-	MetricName                 string
-	Description                string
-	Name                       string
-	configMap                  map[string][]StatConfig
-	measurementString          string
-	verbose                    bool
-	addMetricsFunc             func([]types.Metric) error
-	buildMetricDataQueriesFunc func(int32) ([]types.MetricDataQuery, error)
-	setMetricNameFunc          func(string) error
-	getMetricNameFunc          func() string
+	Metrics           []types.Metric
+	DimensionFilters  []types.DimensionFilter
+	Namespace         string
+	MetricName        string
+	Description       string
+	Name              string
+	configMap         map[string][]StatConfig
+	measurementString string
+	verbose           bool
 }
 
 type PresetInterface interface {
@@ -94,16 +90,10 @@ func (p *Preset) GetNamespace() string {
 }
 
 func (p *Preset) GetMetricName() string {
-	if p.getMetricNameFunc != nil {
-		return p.getMetricNameFunc()
-	}
 	return ""
 }
 
 func (p *Preset) SetMetricName(name string) error {
-	if p.setMetricNameFunc != nil {
-		return p.setMetricNameFunc(name)
-	}
 	return nil
 }
 
@@ -114,9 +104,6 @@ func (p *Preset) GetDescription() string {
 func (p *Preset) AddMetrics(metrics []types.Metric) error {
 	if p.verbose {
 		fmt.Println("Preset::AddMetrics", len(metrics))
-	}
-	if p.addMetricsFunc != nil {
-		return p.addMetricsFunc(metrics)
 	}
 	errStrings := []string{}
 	for _, m := range metrics {
@@ -144,8 +131,8 @@ func (p *Preset) AddMetrics(metrics []types.Metric) error {
 }
 
 func (p *Preset) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, error) {
-	if p.buildMetricDataQueriesFunc != nil {
-		return p.BuildMetricDataQueries(period)
+	if p.verbose {
+		fmt.Println("Preset::BuildMetricDataQueries")
 	}
 	dataQueries := []types.MetricDataQuery{}
 	for _, m := range p.Metrics {

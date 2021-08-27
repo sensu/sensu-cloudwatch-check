@@ -20,10 +20,6 @@ func (p *None) Init(verbose bool) error {
 	if p.verbose {
 		fmt.Println("None::Init Setting up none preset")
 	}
-	p.addMetricsFunc = p.AddMetrics
-	p.buildMetricDataQueriesFunc = p.BuildMetricDataQueries
-	p.setMetricNameFunc = p.SetMetricName
-	p.getMetricNameFunc = p.GetMetricName
 	return nil
 }
 
