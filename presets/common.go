@@ -39,6 +39,7 @@ type PresetInterface interface {
 	GetNamespace() string
 	GetMetricName() string
 	SetMetricName(name string) error
+	SetMeasurementString(config string) error
 	BuildMeasurementConfig() error
 	GetMeasurementString(pretty bool) (string, error)
 	GetDimensionFilters() []types.DimensionFilter
@@ -144,6 +145,11 @@ func (p *Preset) GetMetricName() string {
 }
 
 func (p *Preset) SetMetricName(name string) error {
+	return nil
+}
+
+func (p *Preset) SetMeasurementString(config string) error {
+	p.measurementString = config
 	return nil
 }
 

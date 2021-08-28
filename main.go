@@ -23,8 +23,10 @@ import (
 type Config struct {
 	//Base Sensu plugin configs
 	sensu.PluginConfig
+
 	//AWS specific Sensu plugin configs
 	sensuAWS.AWSPluginConfig
+
 	//Additional configs for this check command
 	Namespace              string
 	MetricName             string
@@ -39,10 +41,7 @@ type Config struct {
 	PresetName             string
 	Preset                 presets.PresetInterface
 	OutputConfig           bool
-	// TODO: replace dryrun HELP with something useful
-	ServiceExplorer bool
-	// TODO: add support for json config
-	ConfigString string
+	ConfigString           string
 }
 
 type MetricQueryMap struct {
@@ -80,6 +79,14 @@ var (
 			Default:   false,
 			Usage:     "Output measurement configuration JSON string",
 			Value:     &plugin.OutputConfig,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "config",
+			Argument:  "config",
+			Shorthand: "c",
+			Default:   "",
+			Usage:     "Use measurement configuration JSON string",
+			Value:     &plugin.ConfigString,
 		},
 
 		&sensu.PluginConfigOption{
@@ -162,9 +169,6 @@ var (
 			Value:     &plugin.DryRun,
 		},
 	}
-	// Keyed list of metricConfig lookup table
-	// TODO: setup json config
-	metricConfig = make(map[string]MetricConfig)
 )
 
 func init() {
@@ -219,21 +223,16 @@ func checkArgs(event *v2.Event) (int, error) {
 		err := fmt.Errorf("No Preset selected")
 		return sensu.CheckStateWarning, err
 	}
+	if len(plugin.ConfigString) > 0 && plugin.PresetName != "None" {
+		return sensu.CheckStateWarning, fmt.Errorf(`Must use preset "None" when using --config`)
+	} else {
+	}
 	if len(plugin.PresetName) == 0 || plugin.PresetName == "None" {
 		// If haven't selected a cloudwatch filter argument switch to dryrun to avoid pulling data for all metrics
-		if len(plugin.Namespace) == 0 && len(plugin.MetricName) == 0 && !plugin.DryRun {
-			return sensu.CheckStateWarning, fmt.Errorf("Must select at least one of: --namespace, --metric, or --dry-run")
+		if len(plugin.ConfigString) == 0 && len(plugin.Namespace) == 0 && len(plugin.MetricName) == 0 && !plugin.DryRun {
+			return sensu.CheckStateWarning, fmt.Errorf("Must select at least one of: --config, --namespace, --metric, or --dry-run")
 		}
 	}
-	/* TODO: setup json config
-	if len(plugin.ConfigString) > 0 {
-		result, err := buildMetricConfig([]byte(plugin.ConfigString))
-		if err != nil {
-			return sensu.CheckStateWarning, err
-		}
-		metricConfig = result
-	}
-	*/
 	return sensu.CheckStateOK, nil
 }
 
@@ -432,6 +431,10 @@ func checkFunction(client ServiceAPI) (int, error) {
 		none.Init(plugin.Verbose)
 		none.Namespace = plugin.Namespace
 		none.AddStats(plugin.StatsList)
+		if len(plugin.ConfigString) > 0 {
+			none.SetMeasurementString(plugin.ConfigString)
+			none.BuildMeasurementConfig()
+		}
 		plugin.Preset = none
 	}
 	plugin.Preset.AddDimensionFilters(plugin.DimensionFilters)
