@@ -3,6 +3,7 @@ package presets
 import (
 	"log"
 	"os"
+	"testing"
 )
 
 var (
@@ -24,4 +25,8 @@ func quiet() func() {
 		os.Stderr = serr
 		log.SetOutput(os.Stderr)
 	}
+}
+
+func TestPresetGetMeasurementString(t *testing.T) {
+
 }

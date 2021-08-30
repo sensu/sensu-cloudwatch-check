@@ -21,7 +21,10 @@ func ToSnakeCase(str string) string {
 }
 
 func BuildLabelBase(m types.Metric) string {
-	s := strings.Split(*m.Namespace, "/")
+	s := strings.Split("Unknown/Namespace", "/")
+	if m.Namespace != nil {
+		s = strings.Split(*m.Namespace, "/")
+	}
 	for i, _ := range s {
 		s[i] = ToSnakeCase(s[i])
 	}

@@ -3,6 +3,7 @@ package presets
 import (
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -61,12 +62,16 @@ func TestNoneBuildMetricDataQueries(t *testing.T) {
 	for i := range metricNames {
 		m := types.Metric{
 			MetricName: &metricNames[i],
+			Namespace:  aws.String("Test"),
 		}
 		metrics = append(metrics, m)
 	}
+	stats := []string{"Average", "Sum"}
+	none.AddStats(stats)
 	err = none.AddMetrics(metrics)
 	assert.NoError(err)
 	none.BuildMetricDataQueries(int32(1))
+
 }
 
 func TestNoneBuildMeasurementString(t *testing.T) {
@@ -111,10 +116,21 @@ func TestNoneGetMeasurementString(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
 	none := &None{}
-	err := none.Init(false)
+	err := none.Init(true)
 	assert.NoError(err)
 	none.Namespace = "Test"
 	stats := []string{"Average", "Sum"}
+	dims := []types.DimensionFilter{
+		types.DimensionFilter{
+			Name:  aws.String("Dim1_Name"),
+			Value: aws.String("Dim1_Value"),
+		},
+		types.DimensionFilter{
+			Name: aws.String("Dim2_Name"),
+		},
+	}
+	err = none.AddDimensionFilters(dims)
+	assert.NoError(err)
 	metricNames := []string{
 		"BackendConnectionErrors",
 		"DesyncMitigationMode_NonCompliant_Request_Count",
@@ -140,6 +156,7 @@ func TestNoneGetMeasurementString(t *testing.T) {
 		metrics = append(metrics, m)
 	}
 	err = none.AddMetrics(metrics)
+	assert.NoError(err)
 	none.AddStats(stats)
 	output, err := none.GetMeasurementString(false)
 	assert.NoError(err)
