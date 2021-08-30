@@ -105,8 +105,8 @@ var (
 			Value:     &plugin.Namespace,
 		},
 		&sensu.PluginConfigOption{
-			Path:      "dimension-filter",
-			Argument:  "dimension-filter",
+			Path:      "dimension-filters",
+			Argument:  "dimension-filters",
 			Shorthand: "D",
 			Default:   []string{},
 			Usage:     `Comma separated list of AWS Cloudwatch Dimension Filters Ex: "Name, SecondName=SecondValue"`,
@@ -491,12 +491,6 @@ func checkFunction(client ServiceAPI) (int, error) {
 			fmt.Println(output)
 		}
 	} else {
-		// Outputing Metrics
-		if numPages > plugin.MaxPages {
-			fmt.Printf("# Warning: max allowed ListMetrics result pages (%v) exceeded, either filter via --namespace or --metric option or increase --max-pages value",
-				plugin.MaxPages)
-			return sensu.CheckStateWarning, nil
-		}
 		metricDataQueries, err = plugin.Preset.BuildMetricDataQueries(int32(plugin.PeriodMinutes))
 		if err != nil {
 			fmt.Println("Could not build DataQuery")
@@ -509,6 +503,12 @@ func checkFunction(client ServiceAPI) (int, error) {
 
 		if state, err := getData(client, metricDataQueries); state != sensu.CheckStateOK {
 			return state, err
+		}
+		// Outputing Metrics
+		if numPages > plugin.MaxPages {
+			fmt.Printf("# Warning: max allowed ListMetrics result pages (%v) exceeded, either filter via --namespace or --metric option or increase --max-pages value",
+				plugin.MaxPages)
+			return sensu.CheckStateWarning, nil
 		}
 
 	}
