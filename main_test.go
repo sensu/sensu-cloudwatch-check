@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/sensu/sensu-cloudwatch-check/common"
+	"github.com/sensu/sensu-cloudwatch-check/presets"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -258,11 +260,15 @@ func TestCheckFunction(t *testing.T) {
 	defer quiet()()
 	cleanPluginValues()
 	plugin.PresetName = "None"
+	plugin.StatsList = []string{"Average"}
+	none := presets.None{}
+	none.AddStats(plugin.StatsList)
+	plugin.Preset = &none
 	plugin.RecentlyActive = true
 	plugin.MetricName = "test"
 	plugin.Namespace = "test"
 	plugin.Verbose = true
-	plugin.StatsList = []string{"Average"}
+
 	cases := []struct {
 		client          mockService
 		expectedState   int
@@ -303,6 +309,7 @@ func TestCheckFunction(t *testing.T) {
 			client.dataResultId = tt.expectedId
 			nextToken = tt.nextToken
 			plugin.MaxPages = tt.maxPages
+			fmt.Printf("plugin:: %+v\n", plugin)
 			state, err := checkFunction(client)
 			if err != nil {
 				t.Fatalf("expect nil error, got %v", err)
