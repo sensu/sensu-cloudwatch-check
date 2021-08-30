@@ -219,3 +219,9 @@ func (p *Preset) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, 
 	}
 	return dataQueries, nil
 }
+
+// overwrite the Init function when building a new preset to enforce specific behavior
+func (p *Preset) Init(verbose bool) error {
+	p.verbose = verbose
+	return nil
+}

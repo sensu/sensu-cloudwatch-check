@@ -6,6 +6,7 @@ type CLB struct {
 	Preset
 }
 
+// Overwrite the Preset Init function to enforce specific behavior
 func (p *CLB) Init(verbose bool) error {
 	p.verbose = verbose
 	p.verbose = verbose

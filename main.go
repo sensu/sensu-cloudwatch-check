@@ -223,15 +223,36 @@ func checkArgs(event *v2.Event) (int, error) {
 		err := fmt.Errorf("No Preset selected")
 		return sensu.CheckStateWarning, err
 	}
-	if len(plugin.ConfigString) > 0 && plugin.PresetName != "None" {
-		return sensu.CheckStateWarning, fmt.Errorf(`Must use preset "None" when using --config`)
-	} else {
+	if len(plugin.ConfigString) > 0 {
+		if plugin.PresetName == "None" {
+			plugin.PresetName = "Custom"
+			p := presets.Preset{Description: "Custom Config"}
+
+			p.SetMeasurementString(plugin.ConfigString)
+			plugin.Preset = &p
+			plugin.Preset.BuildMeasurementConfig()
+
+		} else {
+			return sensu.CheckStateWarning, fmt.Errorf(`ConfigString not None Preset`)
+		}
 	}
+
 	if len(plugin.PresetName) == 0 || plugin.PresetName == "None" {
 		// If haven't selected a cloudwatch filter argument switch to dryrun to avoid pulling data for all metrics
 		if len(plugin.ConfigString) == 0 && len(plugin.Namespace) == 0 && len(plugin.MetricName) == 0 && !plugin.DryRun {
 			return sensu.CheckStateWarning, fmt.Errorf("Must select at least one of: --config, --namespace, --metric, or --dry-run")
 		}
+	}
+	if plugin.PresetName == "None" {
+		none := &presets.None{}
+		none.Init(plugin.Verbose)
+		none.Namespace = plugin.Namespace
+		none.AddStats(plugin.StatsList)
+		if len(plugin.ConfigString) > 0 {
+			none.SetMeasurementString(plugin.ConfigString)
+			none.BuildMeasurementConfig()
+		}
+		plugin.Preset = none
 	}
 	return sensu.CheckStateOK, nil
 }
@@ -426,17 +447,6 @@ func checkFunction(client ServiceAPI) (int, error) {
 	var metricDataQueries []types.MetricDataQuery
 	numMetrics := 0
 	numPages := 0
-	if plugin.PresetName == "None" {
-		none := &presets.None{}
-		none.Init(plugin.Verbose)
-		none.Namespace = plugin.Namespace
-		none.AddStats(plugin.StatsList)
-		if len(plugin.ConfigString) > 0 {
-			none.SetMeasurementString(plugin.ConfigString)
-			none.BuildMeasurementConfig()
-		}
-		plugin.Preset = none
-	}
 	plugin.Preset.AddDimensionFilters(plugin.DimensionFilters)
 	plugin.Preset.SetMetricName(plugin.MetricName)
 	plugin.Preset.Init(plugin.Verbose)
