@@ -16,14 +16,6 @@ type None struct {
 	Stats []string
 }
 
-func (p *None) Init(verbose bool) error {
-	p.verbose = verbose
-	if p.verbose {
-		fmt.Println("None::Init Setting up none preset")
-	}
-	return nil
-}
-
 func (p *None) GetMeasurementString(pretty bool) (string, error) {
 	if err := p.BuildMeasurementString(); err != nil {
 		return "", err
@@ -50,7 +42,7 @@ func (p *None) BuildMeasurementString() error {
 	measurementConfig := MeasurementJSON{}
 	measurementConfig.Measurements = []MeasurementConfig{}
 	measurementConfig.Namespace = p.Namespace
-	measurementConfig.MetricName = p.MetricName
+	measurementConfig.MetricFilter = p.MetricFilter
 	dimStrings := []string{}
 	for _, d := range p.DimensionFilters {
 		output := strings.TrimSpace(*d.Name)
@@ -99,18 +91,18 @@ func (p *None) AddStats(stats []string) {
 	return
 }
 
-func (p *None) GetMetricName() string {
+func (p *None) GetMetricFilter() string {
 	if p.verbose {
-		fmt.Println("None::GetMetricName", p.MetricName)
+		fmt.Println("None::GetMetricName", p.MetricFilter)
 	}
-	return p.MetricName
+	return p.MetricFilter
 }
 
-func (p *None) SetMetricName(name string) error {
+func (p *None) SetMetricFilter(name string) error {
 	if p.verbose {
-		fmt.Println("None::SetMetricName", name)
+		fmt.Println("None::SetMetricFilter", name)
 	}
-	p.MetricName = name
+	p.MetricFilter = name
 	return nil
 }
 

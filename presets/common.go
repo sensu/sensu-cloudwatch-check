@@ -24,7 +24,7 @@ type Preset struct {
 	Metrics           []types.Metric
 	DimensionFilters  []types.DimensionFilter
 	Namespace         string
-	MetricName        string
+	MetricFilter      string
 	Description       string
 	Name              string
 	configMap         map[string][]StatConfig
@@ -37,14 +37,15 @@ type PresetInterface interface {
 	AddMetrics(metrics []types.Metric) error
 	GetDescription() string
 	GetNamespace() string
-	GetMetricName() string
-	SetMetricName(name string) error
+	GetMetricFilter() string
+	SetMetricFilter(name string) error
+	SetVerbose(flag bool) error
 	SetMeasurementString(config string) error
 	BuildMeasurementConfig() error
 	GetMeasurementString(pretty bool) (string, error)
 	GetDimensionFilters() []types.DimensionFilter
 	AddDimensionFilters(filters []types.DimensionFilter) error
-	Init(verbose bool) error
+	Ready() error
 }
 
 type StatConfig struct {
@@ -57,8 +58,8 @@ type MeasurementConfig struct {
 }
 
 type MeasurementJSON struct {
-	Namespace        string              `json:"namespace,omitempty"`
-	MetricName       string              `json:"metric,omitempty"`
+	Namespace        string              `json:"namespace"`
+	MetricFilter     string              `json:"metric-filter,omitempty"`
 	DimensionFilters []string            `json:"dimension-filters,omitempty"`
 	Measurements     []MeasurementConfig `json:"measurements,omitempty"`
 }
@@ -74,7 +75,7 @@ func (p *Preset) GetMeasurementString(pretty bool) (string, error) {
 	measurementConfig := MeasurementJSON{}
 	measurementConfig.Measurements = []MeasurementConfig{}
 	measurementConfig.Namespace = p.Namespace
-	measurementConfig.MetricName = p.MetricName
+	measurementConfig.MetricFilter = p.MetricFilter
 	dimStrings := []string{}
 	for _, d := range p.DimensionFilters {
 		output := strings.TrimSpace(*d.Name)
@@ -140,11 +141,17 @@ func (p *Preset) GetNamespace() string {
 	return p.Namespace
 }
 
-func (p *Preset) GetMetricName() string {
-	return ""
+func (p *Preset) GetMetricFilter() string {
+	return p.MetricFilter
 }
 
-func (p *Preset) SetMetricName(name string) error {
+func (p *Preset) SetMetricFilter(name string) error {
+	p.MetricFilter = name
+	return nil
+}
+
+func (p *Preset) SetVerbose(flag bool) error {
+	p.verbose = flag
 	return nil
 }
 
@@ -163,6 +170,18 @@ func (p *Preset) AddMetrics(metrics []types.Metric) error {
 	}
 	errStrings := []string{}
 	for _, m := range metrics {
+
+		if len(p.MetricFilter) > 0 {
+			if p.MetricFilter != *m.MetricName {
+				str := fmt.Sprintf("Preset.AddMetrics: MetricFilter: %v does not match Metric: %v \n", p.MetricFilter, *m.MetricName)
+				if p.verbose {
+					fmt.Println(str)
+				}
+				errStrings = append(errStrings, str)
+				continue
+			}
+		}
+
 		if p.verbose {
 			fmt.Printf("Preset.AddMetrics: Metric: %v\n", *m.MetricName)
 		}
@@ -221,7 +240,6 @@ func (p *Preset) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, 
 }
 
 // overwrite the Init function when building a new preset to enforce specific behavior
-func (p *Preset) Init(verbose bool) error {
-	p.verbose = verbose
+func (p *Preset) Ready() error {
 	return nil
 }

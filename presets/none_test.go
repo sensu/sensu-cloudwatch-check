@@ -8,11 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNoneInit(t *testing.T) {
+func TestNoneReady(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
 	none := &None{}
-	err := none.Init(true)
+	err := none.SetVerbose(true)
+	assert.NoError(err)
+	err = none.Ready()
 	assert.NoError(err)
 }
 
@@ -20,7 +22,9 @@ func TestNoneAddMetrics(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
 	none := &None{}
-	err := none.Init(false)
+	err := none.SetVerbose(true)
+	assert.NoError(err)
+	err = none.Ready()
 	assert.NoError(err)
 	metricNames := []string{
 		"test",
@@ -40,7 +44,9 @@ func TestNoneBuildMetricDataQueries(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
 	none := &None{}
-	err := none.Init(false)
+	err := none.SetVerbose(true)
+	assert.NoError(err)
+	err = none.Ready()
 	assert.NoError(err)
 	metricNames := []string{
 		"BackendConnectionErrors",
@@ -78,7 +84,9 @@ func TestNoneBuildMeasurementString(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
 	none := &None{}
-	err := none.Init(true)
+	err := none.SetVerbose(true)
+	assert.NoError(err)
+	err = none.Ready()
 	none.Namespace = "Test"
 	assert.NoError(err)
 	metricNames := []string{
@@ -116,7 +124,9 @@ func TestNoneGetMeasurementString(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
 	none := &None{}
-	err := none.Init(true)
+	err := none.SetVerbose(true)
+	assert.NoError(err)
+	err = none.Ready()
 	assert.NoError(err)
 	none.Namespace = "Test"
 	stats := []string{"Average", "Sum"}

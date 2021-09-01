@@ -8,11 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCLBInit(t *testing.T) {
+func TestCLBReady(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
 	elb := &CLB{}
-	err := elb.Init(true)
+	err := elb.SetVerbose(true)
+	assert.NoError(err)
+	err = elb.Ready()
 	assert.NoError(err)
 	assert.Equal("AWS/ELB", elb.Namespace)
 	assert.Equal(2, len(elb.DimensionFilters))
@@ -27,7 +29,9 @@ func TestCLBAddMetrics(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
 	elb := &CLB{}
-	err := elb.Init(false)
+	err := elb.SetVerbose(true)
+	assert.NoError(err)
+	err = elb.Ready()
 	assert.NoError(err)
 	metricNames := []string{
 		"test",
@@ -72,7 +76,9 @@ func TestCLBBuildMetricDataQueries(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
 	elb := &CLB{}
-	err := elb.Init(false)
+	err := elb.SetVerbose(true)
+	assert.NoError(err)
+	err = elb.Ready()
 	assert.NoError(err)
 	metricNames := []string{
 		"BackendConnectionErrors",
@@ -106,7 +112,9 @@ func TestCLBGetMeasurementString(t *testing.T) {
 	defer quiet()()
 	assert := assert.New(t)
 	elb := &CLB{}
-	err := elb.Init(true)
+	err := elb.SetVerbose(true)
+	assert.NoError(err)
+	err = elb.Ready()
 	assert.NoError(err)
 	output, err := elb.GetMeasurementString(true)
 	assert.NoError(err)

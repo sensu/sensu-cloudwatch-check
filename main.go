@@ -121,11 +121,11 @@ var (
 			Value:     &plugin.StatsList,
 		},
 		&sensu.PluginConfigOption{
-			Path:      "metric",
-			Argument:  "metric",
+			Path:      "metric-filter",
+			Argument:  "metric-filter",
 			Shorthand: "M",
 			Default:   "",
-			Usage:     "Cloudwatch Metric Name",
+			Usage:     "Cloudwatch Metric Filter, limit result to given Metric name",
 			Value:     &plugin.MetricName,
 		},
 		&sensu.PluginConfigOption{
@@ -245,7 +245,8 @@ func checkArgs(event *v2.Event) (int, error) {
 	}
 	if plugin.PresetName == "None" {
 		none := &presets.None{}
-		none.Init(plugin.Verbose)
+		none.SetVerbose(plugin.Verbose)
+		none.Ready()
 		none.Namespace = plugin.Namespace
 		none.AddStats(plugin.StatsList)
 		if len(plugin.ConfigString) > 0 {
@@ -296,7 +297,7 @@ func buildListMetricsInput(preset presets.PresetInterface) (*cloudwatch.ListMetr
 	if namespace := preset.GetNamespace(); len(namespace) > 0 {
 		input.Namespace = &namespace
 	}
-	if metricName := preset.GetMetricName(); len(metricName) > 0 {
+	if metricName := preset.GetMetricFilter(); len(metricName) > 0 {
 		input.MetricName = &metricName
 	}
 	if filters := preset.GetDimensionFilters(); len(filters) > 0 {
@@ -385,9 +386,9 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery) (int,
 				}
 				if len(d.Timestamps) > 0 {
 					delete(unusedQueryMap, *d.Id)
-					//outputStrings = append(outputStrings,
-					//	fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v",
-					//		q.Label, q.Namespace, q.MetricName, common.DimString(q.Dimensions, plugin.AWSRegion)))
+					outputStrings = append(outputStrings,
+						fmt.Sprintf("\n# HELP %v Namespace:%v MetricName:%v Dimensions:%v",
+							q.Label, q.Namespace, q.MetricName, common.DimString(q.Dimensions, plugin.AWSRegion)))
 					for i := range d.Timestamps {
 						outputStrings = append(outputStrings,
 							fmt.Sprintf("%v{%v} %v %v",
@@ -395,25 +396,27 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery) (int,
 					}
 				}
 			}
-			if plugin.Verbose {
-				fmt.Printf("   NextToken: %+v\n", dataResult.NextToken)
-				fmt.Printf("   Messages: %+v\n", dataResult.Messages)
-				fmt.Printf("   Data Results:\n")
-				for _, d := range dataResult.MetricDataResults {
-					fmt.Printf("     Id: %v\n", *d.Id)
-					fmt.Printf("     Label: %+v\n", *d.Label)
-					fmt.Printf("     StatusCode: %+v\n", d.StatusCode)
-					fmt.Printf("     Timestamps: %+v\n", d.Timestamps)
-					fmt.Printf("     Values: %+v\n", d.Values)
-				}
-				fmt.Println("")
-			}
 		}
 
 	}
+	if plugin.Verbose {
+		fmt.Println("\nExecution Summary:")
+		fmt.Printf("  MetricDataQueries: %v\n", len(metricDataQueries))
+		fmt.Printf("  Number of MetricDataResults: %v\n", numResults)
+		if len(unusedQueryMap) > 0 {
+			fmt.Printf("#  MetricDataQueries with no results:\n")
+
+			for _, q := range unusedQueryMap {
+				fmt.Printf("    Label: %v\n      Namespace:%v MetricName:%v Dimensions:%v\n",
+					q.Label, q.Namespace, q.MetricName, common.DimString(q.Dimensions, plugin.AWSRegion))
+			}
+		}
+		fmt.Println("")
+		fmt.Println("Normal Output:")
+	}
 	warnFlag := false
 	if len(dataMessages) > 0 {
-		fmt.Println("# Warning: Some calls to GetMetricData resulted in error messages")
+		fmt.Println("\n# Warning: Some calls to GetMetricData resulted in error messages")
 		for _, m := range dataMessages {
 			fmt.Printf("# GetMetricData:: Code: %v Message: %v\n", *m.Code, *m.Value)
 		}
@@ -425,19 +428,6 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery) (int,
 	for _, s := range outputStrings {
 		fmt.Println(s)
 	}
-	if plugin.Verbose {
-		fmt.Println("Summary:")
-		fmt.Printf("  MetricDataQueries: %v\n  QueryMaps: %v\n", len(metricDataQueries), len(metricQueryMap))
-		fmt.Printf("  Number of MetricDataResults: %v\n", numResults)
-		if len(unusedQueryMap) > 0 {
-			fmt.Printf("  MetricDataQueries with no results:\n")
-
-			for _, q := range unusedQueryMap {
-				fmt.Printf("    Label: %v\n      Namespace:%v MetricName:%v Dimensions:%v\n",
-					q.Label, q.Namespace, q.MetricName, common.DimString(q.Dimensions, plugin.AWSRegion))
-			}
-		}
-	}
 	return sensu.CheckStateOK, nil
 
 }
@@ -448,8 +438,9 @@ func checkFunction(client ServiceAPI) (int, error) {
 	numMetrics := 0
 	numPages := 0
 	plugin.Preset.AddDimensionFilters(plugin.DimensionFilters)
-	plugin.Preset.SetMetricName(plugin.MetricName)
-	plugin.Preset.Init(plugin.Verbose)
+	plugin.Preset.SetMetricFilter(plugin.MetricName)
+	plugin.Preset.SetVerbose(plugin.Verbose)
+	plugin.Preset.Ready()
 	//List Metrics result page loop
 	for getList := true; getList && numPages < plugin.MaxPages; {
 		getList = false
