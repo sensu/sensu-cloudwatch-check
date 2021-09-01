@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	enableQuiet = false
+	enableQuiet = true
 )
 
 func quiet() func() {
