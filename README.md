@@ -11,6 +11,7 @@
   - [Help output](#help-output)
   - [Environment Variables](#environment-variables)
   - [Basic Usage](#basic-usage)
+  - [Important Commandline Arguments](#important-commendline-arguments)
   - [Presets](#presets)
   - [Custom Presets](#custom-presets)
   - [Exporting Preset Configuration](#exporting-preset-configuration)
@@ -79,7 +80,23 @@ to optimize the metric response.
 
 *Note:* The CloudWatch API uses a pagation strategy to limit the number of metrics returned in a single query. This check defaults to a limit of 1 page of results but this can be adjusted to meet your need. If the max number of result pages is too small, the check will return a warning status (return status 1) and will included a warning comment in the check output.
 
-#### Example for AWS EC2 in region us-east-1 using stats and metric filter
+*Note:* This check enforces a restriction the cloudwatch API query to limit the size of the cloudwatch query. You must either include the `--namespace` or `--metric-filter` option. See the Cloudwatch ListMetrics API documentation for details.
+
+### Important Commandline Arguments
+####  Namespace
+The `--namespace` argument limits the Cloudwatch query to the given namespace (ex: AWS/EC2).
+*Note:* Either `--namespace` or `--metric` is required
+
+####  Metric Filter
+The `--metric-filter` argument limits the cloudwatch query to a given metric name (ex: CPUUtilization)
+*Note:* Either `--namespace` or `--metric` is required
+
+####  Dimension Filters
+The dimension filters is an array of strings representing dimension key or key=value that must match.
+Allowed dimension filters are specific to AWS Namespace and metric. 
+You should refer to the AWS service documentation for a specific service when choosing the dimension filters to use.
+
+### Example for AWS EC2 in region us-east-1 using stats and metric filter
 
 ```
 sensu-cloudwatch-check --namespace "AWS/EC2" --region "us-east-1" --metric "StatusCheckFailed" --stats "Sum"
@@ -91,12 +108,48 @@ In this example the metric queries are limited to provide only the "Sum" statist
 sensu-cloudwatch-check --namespace "AWS/EC2" --region "us-east-1" --dimension-filters "InstanceId=i-0e302ffdcedaf34b1"
 ```
 
-### Presets
+### AWS CloudWatch Metrics Presets
+This check comes with several presets for specific AWS Services.  These presets provide a curated subset of possible Cloudwatch statistics following an opinionated naming scheme.  These preset configs can be exported as a starting for for your own custom preset configuration (see below.) 
+
+The list of existing service presets includes:
+
+| Preset Name      |Description                 |
+|------------------|----------------------------|
+| ALB              | Preset Metrics for AWS Application Load Balancer            |
+| CLB              | Preset Metrics for AWS Classic Load Balancer                |
+| EC2              | Preset Metrics for AWS EC2                                  |
+| CloudFront       | Preset Metrics for AWS CloudFront. Note: requires --region us-east-1 |
+
+*Note:* The --dimension-filters and --metric-filter arguments can be used to further narrow the results
+from the service presets.
 
 ### Custom Presets
 
+You can define your own service preset by passing a json preset config string into the check using the `--config` option 
+or `CLOUDWATCH_CHECK_CONFIG` envvar.
+
+
 ### Exporting Preset Configuration
- 
+
+The `--output-config` option can be used to generate the json representation of a metric query. 
+This json can be editted as needed to customize the metric query. 
+#### Export examples 
+
+Output a simple `AWS/EC2` namespace metrics configuration
+```
+sensu-cloudwatch-check --namespace "AWS/EC2" --region "us-east-1" --output-config
+```
+
+Output a basic `AWS/EC2` namespace metrics configuration with an active dimension-filter
+```
+sensu-cloudwatch-check --namespace "AWS/EC2" --region "us-east-1" --dimension-filters "InstanceId=i-0e302ffdcedaf34b1" --output-config
+```
+
+Output the EC2 preset configuration
+```
+sensu-cloudwatch-check -P "EC2" --region "us-east-1" --output-config
+```
+
 
 ## Configuration
 
