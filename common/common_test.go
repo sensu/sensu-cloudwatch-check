@@ -66,15 +66,14 @@ func TestDimString(t *testing.T) {
 	assert := assert.New(t)
 	name := "hey"
 	value := "you"
-	expected := `hey="you",Region="antartica-south-1"`
-	region := "antartica-south-1"
+	expected := `"hey=you"`
 	input := []types.Dimension{
 		types.Dimension{
 			Name:  &name,
 			Value: &value,
 		},
 	}
-	output := DimString(input, region)
+	output := DimString(input)
 	assert.Equal(expected, output)
 }
 

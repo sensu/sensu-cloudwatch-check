@@ -190,13 +190,6 @@ func main() {
 }
 
 func checkArgs(event *v2.Event) (int, error) {
-	// Check for valid AWS credentials
-	if plugin.Verbose {
-		fmt.Println("Checking AWS Creds")
-	}
-	if state, err := plugin.CheckAWSCreds(); err != nil {
-		return state, err
-	}
 
 	// Specific Argument Checking for this command
 	if plugin.Verbose {
@@ -255,6 +248,7 @@ func checkArgs(event *v2.Event) (int, error) {
 		none := &presets.None{}
 		none.SetVerbose(plugin.Verbose)
 		none.SetPeriodMinutes(plugin.PeriodMinutes)
+		none.SetRegion(plugin.AWSRegion)
 		none.Ready()
 		none.Namespace = plugin.Namespace
 		none.AddStats(plugin.StatsList)
@@ -263,6 +257,17 @@ func checkArgs(event *v2.Event) (int, error) {
 			none.BuildMeasurementConfig()
 		}
 		plugin.Preset = none
+	}
+	// Use preset aws region if defined
+	if region := plugin.Preset.GetRegion(); len(region) > 0 {
+		plugin.AWSRegion = region
+	}
+	// Check for valid AWS credentials
+	if plugin.Verbose {
+		fmt.Println("Checking AWS Creds")
+	}
+	if state, err := plugin.CheckAWSCreds(); err != nil {
+		return state, err
 	}
 	return sensu.CheckStateOK, nil
 }
@@ -368,8 +373,8 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 				}
 				delete(unusedQueryMap, *d.Id)
 				outputStrings = append(outputStrings,
-					fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Dimensions:%v",
-						q.Label, q.Namespace, q.MetricName, common.DimString(q.Dimensions, plugin.AWSRegion)))
+					fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Region: %v Dimensions:%v",
+						q.Label, q.Namespace, q.MetricName, plugin.AWSConfig.Region, common.DimString(q.Dimensions)))
 
 			}
 		} else {
@@ -396,12 +401,12 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 				if len(d.Timestamps) > 0 {
 					delete(unusedQueryMap, *d.Id)
 					outputStrings = append(outputStrings,
-						fmt.Sprintf("\n# HELP %v Namespace:%v MetricName:%v Dimensions:%v",
-							q.Label, q.Namespace, q.MetricName, common.DimString(q.Dimensions, plugin.AWSRegion)))
+						fmt.Sprintf("\n# HELP %v Namespace:%v MetricName:%v Region:%v Dimensions:%v",
+							q.Label, q.Namespace, q.MetricName, plugin.AWSConfig.Region, common.DimString(q.Dimensions)))
 					for i := range d.Timestamps {
 						outputStrings = append(outputStrings,
 							fmt.Sprintf("%v{%v} %v %v",
-								q.Label, common.DimString(q.Dimensions, plugin.AWSRegion), d.Values[i], d.Timestamps[i].Unix()))
+								q.Label, common.DimString(q.Dimensions), d.Values[i], d.Timestamps[i].Unix()))
 					}
 				}
 			}
@@ -416,8 +421,8 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 			fmt.Printf("  MetricDataQueries with no results:\n")
 
 			for _, q := range unusedQueryMap {
-				fmt.Printf("    Label: %v\n      Namespace:%v MetricName:%v Dimensions:%v\n",
-					q.Label, q.Namespace, q.MetricName, common.DimString(q.Dimensions, plugin.AWSRegion))
+				fmt.Printf("    Label: %v\n      Namespace:%v MetricName:%v Region:%v Dimensions:%v\n",
+					q.Label, q.Namespace, q.MetricName, plugin.AWSConfig.Region, common.DimString(q.Dimensions))
 			}
 		}
 		fmt.Println("")
@@ -492,7 +497,11 @@ func checkFunction(client ServiceAPI) (int, error) {
 			fmt.Println(output)
 		}
 	} else {
-		metricDataQueries, err = plugin.Preset.BuildMetricDataQueries(int32(plugin.PeriodMinutes))
+		periodMinutes := plugin.PeriodMinutes
+		if p := plugin.Preset.GetPeriodMinutes(); p > 0 {
+			periodMinutes = p
+		}
+		metricDataQueries, err = plugin.Preset.BuildMetricDataQueries(int32(periodMinutes))
 		if err != nil {
 			fmt.Println("Could not build DataQuery")
 			return sensu.CheckStateCritical, nil
@@ -500,10 +509,6 @@ func checkFunction(client ServiceAPI) (int, error) {
 		if len(metricDataQueries) == 0 {
 			fmt.Println("No metricDataQueries to process")
 			return sensu.CheckStateWarning, nil
-		}
-		periodMinutes := plugin.PeriodMinutes
-		if p := plugin.Preset.GetPeriodMinutes(); p > 0 {
-			periodMinutes = p
 		}
 		if state, err := getData(client, metricDataQueries, periodMinutes); state != sensu.CheckStateOK {
 			return state, err
