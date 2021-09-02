@@ -241,7 +241,7 @@ func (p *Preset) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, 
 	return dataQueries, nil
 }
 
-// overwrite the Init function when building a new preset to enforce specific behavior
+// overwrite the Ready function when building a new preset to enforce specific behavior
 func (p *Preset) Ready() error {
 	return nil
 }

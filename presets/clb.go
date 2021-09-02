@@ -6,7 +6,7 @@ type CLB struct {
 	Preset
 }
 
-// Overwrite the Preset Init function to enforce specific behavior
+// Overwrite the Preset Ready function to enforce specific behavior
 func (p *CLB) Ready() error {
 	if p.verbose {
 		fmt.Println("CLB::Ready Setting up clb preset")

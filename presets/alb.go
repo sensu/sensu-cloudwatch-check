@@ -6,7 +6,7 @@ type ALB struct {
 	Preset
 }
 
-// Overwrite the Preset Init function to enforce specific behavior
+// Overwrite the Preset Ready function to enforce specific behavior
 func (p *ALB) Ready() error {
 	if p.verbose {
 		fmt.Println("ALB::Ready Setting up presets")
