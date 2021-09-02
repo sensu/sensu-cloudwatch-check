@@ -404,7 +404,7 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery) (int,
 		fmt.Printf("  MetricDataQueries: %v\n", len(metricDataQueries))
 		fmt.Printf("  Number of MetricDataResults: %v\n", numResults)
 		if len(unusedQueryMap) > 0 {
-			fmt.Printf("#  MetricDataQueries with no results:\n")
+			fmt.Printf("  MetricDataQueries with no results:\n")
 
 			for _, q := range unusedQueryMap {
 				fmt.Printf("    Label: %v\n      Namespace:%v MetricName:%v Dimensions:%v\n",
