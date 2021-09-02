@@ -9,7 +9,7 @@ type CLB struct {
 // Overwrite the Preset Init function to enforce specific behavior
 func (p *CLB) Ready() error {
 	if p.verbose {
-		fmt.Println("CLB::Init Setting up clb preset")
+		fmt.Println("CLB::Ready Setting up clb preset")
 	}
 
 	// JSON Config String developed on 2021-08-18 from AWS Cloudwatch documentation

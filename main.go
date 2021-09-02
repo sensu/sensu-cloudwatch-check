@@ -416,7 +416,7 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery) (int,
 	}
 	warnFlag := false
 	if len(dataMessages) > 0 {
-		fmt.Println("\n# Warning: Some calls to GetMetricData resulted in error messages")
+		fmt.Println("# Warning: Some calls to GetMetricData resulted in error messages")
 		for _, m := range dataMessages {
 			fmt.Printf("# GetMetricData:: Code: %v Message: %v\n", *m.Code, *m.Value)
 		}
@@ -497,7 +497,7 @@ func checkFunction(client ServiceAPI) (int, error) {
 		}
 		// Outputing Metrics
 		if numPages > plugin.MaxPages {
-			fmt.Printf("# Warning: max allowed ListMetrics result pages (%v) exceeded, either filter via --namespace or --metric option or increase --max-pages value",
+			fmt.Printf("\n# Warning: max allowed ListMetrics result pages (%v) exceeded, either filter via --namespace or --metric option or increase --max-pages value\n",
 				plugin.MaxPages)
 			return sensu.CheckStateWarning, nil
 		}

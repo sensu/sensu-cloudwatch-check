@@ -19,6 +19,7 @@ func init() {
 	Presets["None"] = &None{Preset: Preset{Description: "No Service Presets Active, use cmdline --namespace --metric --dimension-filters to tailer cloudwatch results"}}
 	Presets["CLB"] = &CLB{Preset: Preset{Description: "Preset Metrics for AWS Classic Load Balancer"}}
 	Presets["ALB"] = &ALB{Preset: Preset{Description: "Preset Metrics for AWS Application Load Balancer"}}
+	Presets["EC2"] = &EC2{Preset: Preset{Description: "Preset Metrics for AWS EC2"}}
 }
 
 type Preset struct {
