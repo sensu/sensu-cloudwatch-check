@@ -68,10 +68,18 @@ Flags:
 
 |Argument                       |Environment Variable                 |
 |-------------------------------|-------------------------------------|
-|--region                       |AWS_REGION                |
-|--profile                      |AWS_PROFILE                |
+|--region                       |AWS_REGION                           |
+|--profile                      |AWS_PROFILE                          |
+|--namespace                    | CLOUDWATCH_CHECK_NAMESPACE          |
+|--metric-filter                | CLOUDWATCH_CHECK_METRIC_FILTER      | 
+|--dimension-filters            | CLOUDWATCH_CHECK_DIMENSION_FILTERS  |
+|--stats                        | CLOUDWATCH_CHECK_STATS              |
+|--config                       | CLOUDWATCH_CHECK_CONFIG             |
+|--preset                       | CLOUDWATCH_CHECK_PRESET             |
+|--max-pages                    | CLOUDWATCH_CHECK_MAX_PAGES          |
+|--period-minutes               | CLOUDWATCH_CHECK_PERIOD_MINUTES     |
 
-
+  
 ### Basic Usage
 To retrieve all available metrics from a specific AWS service from a particular region is to specific the 
 --namespace and --region cmdline arguments. Normally --region will be automatically detected as part of your 

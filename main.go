@@ -83,9 +83,10 @@ var (
 		&sensu.PluginConfigOption{
 			Path:      "config",
 			Argument:  "config",
+			Env:       "CLOUDWATCH_CHECK_CONFIG",
 			Shorthand: "c",
 			Default:   "",
-			Usage:     "Use measurement configuration JSON string",
+			Usage:     "The measurement configuration JSON string to use",
 			Value:     &plugin.ConfigString,
 		},
 
@@ -99,6 +100,7 @@ var (
 		&sensu.PluginConfigOption{
 			Path:      "namespace",
 			Argument:  "namespace",
+			Env:       "CLOUDWATCH_CHECK_NAMESPACE",
 			Shorthand: "N",
 			Default:   "",
 			Usage:     "Cloudwatch Metric Namespace",
@@ -107,6 +109,7 @@ var (
 		&sensu.PluginConfigOption{
 			Path:      "dimension-filters",
 			Argument:  "dimension-filters",
+			Env:       "CLOUDWATCH_CHECK_DIMENSION_FILTERS",
 			Shorthand: "D",
 			Default:   []string{},
 			Usage:     `Comma separated list of AWS Cloudwatch Dimension Filters Ex: "Name, SecondName=SecondValue"`,
@@ -115,6 +118,7 @@ var (
 		&sensu.PluginConfigOption{
 			Path:      "stats",
 			Argument:  "stats",
+			Env:       "CLOUDWATCH_CHECK_STATS",
 			Shorthand: "S",
 			Default:   []string{"Average", "Sum", "SampleCount", "Maximum", "Minimum"},
 			Usage:     `Comma separated list of AWS Cloudwatch Status Ex: "Average, Sum"`,
@@ -123,6 +127,7 @@ var (
 		&sensu.PluginConfigOption{
 			Path:      "metric-filter",
 			Argument:  "metric-filter",
+			Env:       "CLOUDWATCH_CHECK_METRIC_FILTER",
 			Shorthand: "M",
 			Default:   "",
 			Usage:     "Cloudwatch Metric Filter, limit result to given Metric name",
@@ -131,14 +136,16 @@ var (
 		&sensu.PluginConfigOption{
 			Path:      "preset",
 			Argument:  "preset",
+			Env:       "CLOUDWATCH_CHECK_PRESET",
 			Shorthand: "P",
 			Default:   "None",
-			Usage:     "Preset Name",
+			Usage:     "The service preset to use",
 			Value:     &plugin.PresetName,
 		},
 		&sensu.PluginConfigOption{
 			Path:      "max-pages",
 			Argument:  "max-pages",
+			Env:       "CLOUDWATCH_CHECK_MAX_PAGES",
 			Shorthand: "m",
 			Default:   1,
 			Usage:     "Maximum number of result pages. A zero value will disable the limit",
@@ -147,9 +154,10 @@ var (
 		&sensu.PluginConfigOption{
 			Path:      "period-minutes",
 			Argument:  "period-minutes",
+			Env:       "CLOUDWATCH_CHECK_PERIOD_MINUTES",
 			Shorthand: "p",
 			Default:   1,
-			Usage:     "Period in minutes for metrics statistic calculation",
+			Usage:     "Previous number of minutes to consider for metrics statistic calculation",
 			Value:     &plugin.PeriodMinutes,
 		},
 		&sensu.PluginConfigOption{
