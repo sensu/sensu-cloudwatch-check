@@ -29,14 +29,6 @@ func (p *EC2) Ready() error {
         {
           "stat": "Sum",
           "measurement": "aws.ec2.cpu_surplus_credits_charged.sum"
-        },
-        {
-          "stat": "Maximum",
-          "measurement": "aws.ec2.cpu_surplus_credits_charged.maximum"
-        },
-        {
-          "stat": "Minimum",
-          "measurement": "aws.ec2.cpu_surplus_credits_charged.minimum"
         }
       ]
     },
@@ -63,14 +55,6 @@ func (p *EC2) Ready() error {
         {
           "stat": "Sum",
           "measurement": "aws.ec2.cpu_surplus_credit_balance.sum"
-        },
-        {
-          "stat": "Maximum",
-          "measurement": "aws.ec2.cpu_surplus_credit_balance.maximum"
-        },
-        {
-          "stat": "Minimum",
-          "measurement": "aws.ec2.cpu_surplus_credit_balance.minimum"
         }
       ]
     },
@@ -84,18 +68,6 @@ func (p *EC2) Ready() error {
         {
           "stat": "Sum",
           "measurement": "aws.ec2.cpu_credit_balance.sum"
-        },
-        {
-          "stat": "SampleCount",
-          "measurement": "aws.ec2.cpu_credit_balance.sample_count"
-        },
-        {
-          "stat": "Maximum",
-          "measurement": "aws.ec2.cpu_credit_balance.maximum"
-        },
-        {
-          "stat": "Minimum",
-          "measurement": "aws.ec2.cpu_credit_balance.minimum"
         }
       ]
     },
@@ -125,14 +97,6 @@ func (p *EC2) Ready() error {
           "measurement": "aws.ec2.cpu_utilization.average"
         },
         {
-          "stat": "Sum",
-          "measurement": "aws.ec2.cpu_utilization.sum"
-        },
-        {
-          "stat": "SampleCount",
-          "measurement": "aws.ec2.cpu_utilization.sample_count"
-        },
-        {
           "stat": "Maximum",
           "measurement": "aws.ec2.cpu_utilization.maximum"
         },
@@ -146,24 +110,8 @@ func (p *EC2) Ready() error {
       "metric": "MetadataNoToken",
       "config": [
         {
-          "stat": "Average",
-          "measurement": "aws.ec2.metadata_no_token.average"
-        },
-        {
           "stat": "Sum",
-          "measurement": "aws.ec2.metadata_no_token.sum"
-        },
-        {
-          "stat": "SampleCount",
-          "measurement": "aws.ec2.metadata_no_token.sample_count"
-        },
-        {
-          "stat": "Maximum",
-          "measurement": "aws.ec2.metadata_no_token.maximum"
-        },
-        {
-          "stat": "Minimum",
-          "measurement": "aws.ec2.metadata_no_token.minimum"
+          "measurement": "aws.ec2.metadata_no_token"
         }
       ]
     },
@@ -171,24 +119,8 @@ func (p *EC2) Ready() error {
       "metric": "StatusCheckFailed_System",
       "config": [
         {
-          "stat": "Average",
-          "measurement": "aws.ec2.status_check_failed_system.average"
-        },
-        {
-          "stat": "Sum",
-          "measurement": "aws.ec2.status_check_failed_system.sum"
-        },
-        {
-          "stat": "SampleCount",
-          "measurement": "aws.ec2.status_check_failed_system.sample_count"
-        },
-        {
           "stat": "Maximum",
-          "measurement": "aws.ec2.status_check_failed_system.maximum"
-        },
-        {
-          "stat": "Minimum",
-          "measurement": "aws.ec2.status_check_failed_system.minimum"
+          "measurement": "aws.ec2.status_check_failed_system"
         }
       ]
     },
@@ -196,24 +128,8 @@ func (p *EC2) Ready() error {
       "metric": "StatusCheckFailed_Instance",
       "config": [
         {
-          "stat": "Average",
-          "measurement": "aws.ec2.status_check_failed__instance.average"
-        },
-        {
-          "stat": "Sum",
-          "measurement": "aws.ec2.status_check_failed__instance.sum"
-        },
-        {
-          "stat": "SampleCount",
-          "measurement": "aws.ec2.status_check_failed__instance.sample_count"
-        },
-        {
           "stat": "Maximum",
-          "measurement": "aws.ec2.status_check_failed__instance.maximum"
-        },
-        {
-          "stat": "Minimum",
-          "measurement": "aws.ec2.status_check_failed__instance.minimum"
+          "measurement": "aws.ec2.status_check_failed__instance"
         }
       ]
     },
@@ -221,24 +137,8 @@ func (p *EC2) Ready() error {
       "metric": "StatusCheckFailed",
       "config": [
         {
-          "stat": "Average",
-          "measurement": "aws.ec2.status_check_failed.average"
-        },
-        {
-          "stat": "Sum",
-          "measurement": "aws.ec2.status_check_failed.sum"
-        },
-        {
-          "stat": "SampleCount",
-          "measurement": "aws.ec2.status_check_failed.sample_count"
-        },
-        {
           "stat": "Maximum",
-          "measurement": "aws.ec2.status_check_failed.maximum"
-        },
-        {
-          "stat": "Minimum",
-          "measurement": "aws.ec2.status_check_failed.minimum"
+          "measurement": "aws.ec2.status_check_failed"
         }
       ]
     },
@@ -246,24 +146,8 @@ func (p *EC2) Ready() error {
       "metric": "DiskWriteBytes",
       "config": [
         {
-          "stat": "Average",
-          "measurement": "aws.ec2.disk_write_bytes.average"
-        },
-        {
           "stat": "Sum",
-          "measurement": "aws.ec2.disk_write_bytes.sum"
-        },
-        {
-          "stat": "SampleCount",
-          "measurement": "aws.ec2.disk_write_bytes.sample_count"
-        },
-        {
-          "stat": "Maximum",
-          "measurement": "aws.ec2.disk_write_bytes.maximum"
-        },
-        {
-          "stat": "Minimum",
-          "measurement": "aws.ec2.disk_write_bytes.minimum"
+          "measurement": "aws.ec2.disk_write_bytes"
         }
       ]
     },
@@ -280,24 +164,8 @@ func (p *EC2) Ready() error {
       "metric": "DiskReadOps",
       "config": [
         {
-          "stat": "Average",
-          "measurement": "aws.ec2.disk_read_ops.average"
-        },
-        {
           "stat": "Sum",
-          "measurement": "aws.ec2.disk_read_ops.sum"
-        },
-        {
-          "stat": "SampleCount",
-          "measurement": "aws.ec2.disk_read_ops.sample_count"
-        },
-        {
-          "stat": "Maximum",
-          "measurement": "aws.ec2.disk_read_ops.maximum"
-        },
-        {
-          "stat": "Minimum",
-          "measurement": "aws.ec2.disk_read_ops.minimum"
+          "measurement": "aws.ec2.disk_read_ops"
         }
       ]
     },
@@ -305,24 +173,8 @@ func (p *EC2) Ready() error {
       "metric": "DiskWriteOps",
       "config": [
         {
-          "stat": "Average",
-          "measurement": "aws.ec2.disk_write_ops.average"
-        },
-        {
           "stat": "Sum",
-          "measurement": "aws.ec2.disk_write_ops.sum"
-        },
-        {
-          "stat": "SampleCount",
-          "measurement": "aws.ec2.disk_write_ops.sample_count"
-        },
-        {
-          "stat": "Maximum",
-          "measurement": "aws.ec2.disk_write_ops.maximum"
-        },
-        {
-          "stat": "Minimum",
-          "measurement": "aws.ec2.disk_write_ops.minimum"
+          "measurement": "aws.ec2.disk_write_ops"
         }
       ]
     },
@@ -330,24 +182,8 @@ func (p *EC2) Ready() error {
       "metric": "DiskReadBytes",
       "config": [
         {
-          "stat": "Average",
-          "measurement": "aws.ec2.disk_read_bytes.average"
-        },
-        {
           "stat": "Sum",
-          "measurement": "aws.ec2.disk_read_bytes.sum"
-        },
-        {
-          "stat": "SampleCount",
-          "measurement": "aws.ec2.disk_read_bytes.sample_count"
-        },
-        {
-          "stat": "Maximum",
-          "measurement": "aws.ec2.disk_read_bytes.maximum"
-        },
-        {
-          "stat": "Minimum",
-          "measurement": "aws.ec2.disk_read_bytes.minimum"
+          "measurement": "aws.ec2.disk_read_bytes"
         }
       ]
     },

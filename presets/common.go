@@ -20,6 +20,7 @@ func init() {
 	Presets["CLB"] = &CLB{Preset: Preset{Description: "Preset Metrics for AWS Classic Load Balancer"}}
 	Presets["ALB"] = &ALB{Preset: Preset{Description: "Preset Metrics for AWS Application Load Balancer"}}
 	Presets["EC2"] = &EC2{Preset: Preset{Description: "Preset Metrics for AWS EC2"}}
+	Presets["CloudFront"] = &CloudFront{Preset: Preset{Description: "Preset Metrics for AWS CloudFront. Note: requires --region us-east-1"}}
 }
 
 type Preset struct {
