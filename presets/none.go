@@ -42,6 +42,7 @@ func (p *None) BuildMeasurementString() error {
 	measurementConfig := MeasurementJSON{}
 	measurementConfig.Measurements = []MeasurementConfig{}
 	measurementConfig.Namespace = p.Namespace
+	measurementConfig.PeriodMinutes = p.PeriodMinutes
 	measurementConfig.MetricFilter = p.MetricFilter
 	dimStrings := []string{}
 	for _, d := range p.DimensionFilters {

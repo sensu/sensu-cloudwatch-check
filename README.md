@@ -100,9 +100,13 @@ The `--metric-filter` argument limits the cloudwatch query to a given metric nam
 *Note:* Either `--namespace` or `--metric` is required
 
 ####  Dimension Filters
-The dimension filters is an array of strings representing dimension key or key=value that must match.
+The `--dimension-filters` is a comma deimited list of strings representing Cloudwatch dimension filters of the form `key` or `key=value` that must match.
 Allowed dimension filters are specific to AWS Namespace and metric. 
 You should refer to the AWS service documentation for a specific service when choosing the dimension filters to use.
+
+
+####  Period
+The `--period-minutes` instructs the Cloudwatch service the length of time to accumulate metric statistics. The default is 1 minute, meaning Cloudwatch will be asked to return metric statistics for the previous 1 minute period.  Difference AWS services populate Cloudwatch metrics on a different cadence, and if the period is too short, you may not have any metrics output.  For example S3 bucket metrics are uploaded on a 1 day (1440 minute) cadence. 
 
 ### Example for AWS EC2 in region us-east-1 using stats and metric filter
 

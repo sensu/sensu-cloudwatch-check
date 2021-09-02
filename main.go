@@ -254,6 +254,7 @@ func checkArgs(event *v2.Event) (int, error) {
 	if plugin.PresetName == "None" {
 		none := &presets.None{}
 		none.SetVerbose(plugin.Verbose)
+		none.SetPeriodMinutes(plugin.PeriodMinutes)
 		none.Ready()
 		none.Namespace = plugin.Namespace
 		none.AddStats(plugin.StatsList)
@@ -314,15 +315,15 @@ func buildListMetricsInput(preset presets.PresetInterface) (*cloudwatch.ListMetr
 	return input, nil
 }
 
-func buildGetMetricDataInput(metricDataQueries []types.MetricDataQuery) (*cloudwatch.GetMetricDataInput, error) {
+func buildGetMetricDataInput(metricDataQueries []types.MetricDataQuery, periodMinutes int) (*cloudwatch.GetMetricDataInput, error) {
 	input := &cloudwatch.GetMetricDataInput{}
 	input.EndTime = aws.Time(time.Unix(time.Now().Unix(), 0))
-	input.StartTime = aws.Time(time.Unix(time.Now().Add(time.Duration(-plugin.PeriodMinutes)*time.Minute).Unix(), 0))
+	input.StartTime = aws.Time(time.Unix(time.Now().Add(time.Duration(-periodMinutes)*time.Minute).Unix(), 0))
 	input.MetricDataQueries = metricDataQueries
 	return input, nil
 }
 
-func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery) (int, error) {
+func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, periodMinutes int) (int, error) {
 	metricQueryMap := make(map[string]MetricQueryMap)
 	unusedQueryMap := make(map[string]MetricQueryMap)
 	outputStrings := []string{}
@@ -351,7 +352,7 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery) (int,
 			j = len(metricDataQueries)
 		}
 		dataQuerySlice := metricDataQueries[i:j]
-		getMetricDataInput, err := buildGetMetricDataInput(dataQuerySlice)
+		getMetricDataInput, err := buildGetMetricDataInput(dataQuerySlice, periodMinutes)
 		if err != nil {
 			fmt.Println("Could not build GetMetricsDataInput")
 			return sensu.CheckStateCritical, nil
@@ -500,8 +501,11 @@ func checkFunction(client ServiceAPI) (int, error) {
 			fmt.Println("No metricDataQueries to process")
 			return sensu.CheckStateWarning, nil
 		}
-
-		if state, err := getData(client, metricDataQueries); state != sensu.CheckStateOK {
+		periodMinutes := plugin.PeriodMinutes
+		if p := plugin.Preset.GetPeriodMinutes(); p > 0 {
+			periodMinutes = p
+		}
+		if state, err := getData(client, metricDataQueries, periodMinutes); state != sensu.CheckStateOK {
 			return state, err
 		}
 		// Outputing Metrics

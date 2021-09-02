@@ -28,6 +28,7 @@ type Preset struct {
 	DimensionFilters  []types.DimensionFilter
 	Namespace         string
 	MetricFilter      string
+	PeriodMinutes     int
 	Description       string
 	Name              string
 	configMap         map[string][]StatConfig
@@ -42,6 +43,8 @@ type PresetInterface interface {
 	GetNamespace() string
 	GetMetricFilter() string
 	SetMetricFilter(name string) error
+	GetPeriodMinutes() int
+	SetPeriodMinutes(period int) error
 	SetVerbose(flag bool) error
 	SetMeasurementString(config string) error
 	BuildMeasurementConfig() error
@@ -62,6 +65,7 @@ type MeasurementConfig struct {
 
 type MeasurementJSON struct {
 	Namespace        string              `json:"namespace"`
+	PeriodMinutes    int                 `json:"period-minutes,omitempty"`
 	MetricFilter     string              `json:"metric-filter,omitempty"`
 	DimensionFilters []string            `json:"dimension-filters,omitempty"`
 	Measurements     []MeasurementConfig `json:"measurements,omitempty"`
@@ -78,6 +82,7 @@ func (p *Preset) GetMeasurementString(pretty bool) (string, error) {
 	measurementConfig := MeasurementJSON{}
 	measurementConfig.Measurements = []MeasurementConfig{}
 	measurementConfig.Namespace = p.Namespace
+	measurementConfig.PeriodMinutes = p.PeriodMinutes
 	measurementConfig.MetricFilter = p.MetricFilter
 	dimStrings := []string{}
 	for _, d := range p.DimensionFilters {
@@ -117,6 +122,9 @@ func (p *Preset) BuildMeasurementConfig() error {
 	if len(measurementConfig.Namespace) > 0 {
 		p.Namespace = measurementConfig.Namespace
 	}
+	if measurementConfig.PeriodMinutes > 0 {
+		p.PeriodMinutes = measurementConfig.PeriodMinutes
+	}
 	if len(measurementConfig.DimensionFilters) > 0 {
 		if dimensionFilters, err := common.BuildDimensionFilters(measurementConfig.DimensionFilters); err == nil {
 			p.AddDimensionFilters(dimensionFilters)
@@ -150,6 +158,15 @@ func (p *Preset) GetMetricFilter() string {
 
 func (p *Preset) SetMetricFilter(name string) error {
 	p.MetricFilter = name
+	return nil
+}
+
+func (p *Preset) GetPeriodMinutes() int {
+	return p.PeriodMinutes
+}
+
+func (p *Preset) SetPeriodMinutes(period int) error {
+	p.PeriodMinutes = period
 	return nil
 }
 
