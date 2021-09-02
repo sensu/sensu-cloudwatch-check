@@ -359,6 +359,14 @@ func TestCheckFunctionDryRun(t *testing.T) {
 		},
 		{ //start of struct
 			client:          mockService{},
+			maxPages:        0,
+			nextToken:       true,
+			expectedState:   0,
+			includeMessages: false,
+			expectedId:      "test",
+		},
+		{ //start of struct
+			client:          mockService{},
 			maxPages:        2,
 			nextToken:       true,
 			expectedState:   0,

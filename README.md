@@ -51,7 +51,7 @@ Flags:
   -D, --dimension-filters strings    Comma separated list of AWS Cloudwatch Dimension Filters Ex: "Name, SecondName=SecondValue"
   -M, --metric string               Cloudwatch Metric Name
   -S, --stats strings               Comma separated list of AWS Cloudwatch Status Ex: "Average, Sum" (default [Average,Sum,SampleCount,Maximum,Minimum])
-  -m, --max-pages int               Maximum number of result pages (default 1)
+  -m, --max-pages int               Maximum number of result pages. A zero value will disable the limit (default 1)
   -o, --output-config               Output measurement configuration JSON string
   -p, --period-minutes int          Period in minutes for metrics statistic calculation (default 1)
   -P, --preset string               Preset Name (default "None")
@@ -65,11 +65,19 @@ Flags:
 
 ### Environment Variables
 
+|Argument                       |Environment Variable                 |
+|-------------------------------|-------------------------------------|
+|--region                       |AWS_REGION                |
+|--profile                      |AWS_PROFILE                |
+
+
 ### Basic Usage
 To retrieve all available metrics from a specific AWS service from a particular region is to specific the 
 --namespace and --region cmdline arguments. Normally --region will be automatically detected as part of your 
 AWS credentials profiles, but you may specify a different region if required.  Other arguments can be added
 to optimize the metric response.
+
+*Note:* The CloudWatch API uses a pagation strategy to limit the number of metrics returned in a single query. This check defaults to a limit of 1 page of results but this can be adjusted to meet your need. If the max number of result pages is too small, the check will return a warning status (return status 1) and will included a warning comment in the check output.
 
 #### Example for AWS EC2 in region us-east-1 using stats and metric filter
 

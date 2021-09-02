@@ -141,7 +141,7 @@ var (
 			Argument:  "max-pages",
 			Shorthand: "m",
 			Default:   1,
-			Usage:     "Maximum number of result pages",
+			Usage:     "Maximum number of result pages. A zero value will disable the limit",
 			Value:     &plugin.MaxPages,
 		},
 		&sensu.PluginConfigOption{
@@ -442,7 +442,8 @@ func checkFunction(client ServiceAPI) (int, error) {
 	plugin.Preset.SetVerbose(plugin.Verbose)
 	plugin.Preset.Ready()
 	//List Metrics result page loop
-	for getList := true; getList && numPages < plugin.MaxPages; {
+
+	for getList := true; getList && (plugin.MaxPages == 0 || numPages < plugin.MaxPages); {
 		getList = false
 		input, err := buildListMetricsInput(plugin.Preset)
 		if err != nil {
@@ -496,7 +497,7 @@ func checkFunction(client ServiceAPI) (int, error) {
 			return state, err
 		}
 		// Outputing Metrics
-		if numPages > plugin.MaxPages {
+		if plugin.MaxPages > 0 && numPages > plugin.MaxPages {
 			fmt.Printf("\n# Warning: max allowed ListMetrics result pages (%v) exceeded, either filter via --namespace or --metric option or increase --max-pages value\n",
 				plugin.MaxPages)
 			return sensu.CheckStateWarning, nil
