@@ -144,6 +144,7 @@ func (p *Preset) BuildMeasurementConfig() error {
 	for _, m := range measurementConfig.Measurements {
 		p.configMap[m.MetricName] = []StatConfig{}
 		for _, item := range m.Config {
+			item.Measurement = strings.ReplaceAll(item.Measurement, ".", "_")
 			p.configMap[m.MetricName] = append(p.configMap[m.MetricName], item)
 		}
 
@@ -207,7 +208,22 @@ func (p *Preset) AddMetrics(metrics []types.Metric) error {
 	}
 	errStrings := []string{}
 	for _, m := range metrics {
-
+		if m.MetricName == nil {
+			str := fmt.Sprintf("Preset.AddMetrics: MetricName missing in metric\n")
+			if p.verbose {
+				fmt.Println(str)
+			}
+			errStrings = append(errStrings, str)
+			continue
+		}
+		if m.Namespace == nil {
+			str := fmt.Sprintf("Preset.AddMetrics: Namespace missing in metric\n")
+			if p.verbose {
+				fmt.Println(str)
+			}
+			errStrings = append(errStrings, str)
+			continue
+		}
 		if len(p.MetricFilter) > 0 {
 			if p.MetricFilter != *m.MetricName {
 				str := fmt.Sprintf("Preset.AddMetrics: MetricFilter: %v does not match Metric: %v \n", p.MetricFilter, *m.MetricName)
@@ -220,7 +236,7 @@ func (p *Preset) AddMetrics(metrics []types.Metric) error {
 		}
 
 		if p.verbose {
-			fmt.Printf("Preset.AddMetrics: Metric: %v\n", *m.MetricName)
+			fmt.Printf("Preset.AddMetrics: Metric: %v Namespace: %v\n", *m.MetricName, *m.Namespace)
 		}
 		if _, ok := p.configMap[*m.MetricName]; ok {
 			if p.verbose {
@@ -255,19 +271,36 @@ func (p *Preset) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, 
 				id := uuid.New()
 				idString := "aws_" + strings.ReplaceAll(id.String(), "-", "_")
 				if p.verbose {
-					fmt.Printf("Preset.BuildMetricDataQueries: %v %v %v %v\n", *m.MetricName, idString, stat, measurement)
+					fmt.Printf("Preset.BuildMetricDataQueries: %v %v %v %v %v\n", *m.MetricName, idString, stat, measurement, *m.Namespace)
 				}
 				labelString := measurement
+				dimensions := []types.Dimension{}
+				for _, d := range m.Dimensions {
+					dimension := types.Dimension{}
+					if d.Name != nil {
+						dimension.Name = aws.String(*d.Name)
+					}
+					if d.Value != nil {
+						dimension.Value = aws.String(*d.Value)
+					}
+					dimensions = append(dimensions, dimension)
+				}
+
 				dataQuery := types.MetricDataQuery{
 					Id:    &idString,
 					Label: &labelString,
 					MetricStat: &types.MetricStat{
-						Metric: &m,
+						Metric: &types.Metric{
+							Dimensions: dimensions,
+							MetricName: aws.String(*m.MetricName),
+							Namespace:  aws.String(*m.Namespace),
+						},
 						Period: aws.Int32(60 * period),
 						Stat:   aws.String(stat),
 					},
 				}
 				dataQueries = append(dataQueries, dataQuery)
+
 			}
 		} else {
 			fmt.Printf("Preset.BuildMetricDataQueries no config for: %v\n", *m.MetricName)

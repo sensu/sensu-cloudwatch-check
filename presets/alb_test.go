@@ -37,9 +37,11 @@ func TestALBAddMetrics(t *testing.T) {
 		"test",
 	}
 	metrics := []types.Metric{}
+	namespace := "AWS/ELB"
 	for i := range metricNames {
 		m := types.Metric{
 			MetricName: &metricNames[i],
+			Namespace:  &namespace,
 		}
 		metrics = append(metrics, m)
 	}
@@ -56,6 +58,7 @@ func TestALBAddMetrics(t *testing.T) {
 	for i := range metricNames {
 		m := types.Metric{
 			MetricName: &metricNames[i],
+			Namespace:  &namespace,
 		}
 		metrics = append(metrics, m)
 	}
@@ -80,9 +83,11 @@ func TestALBBuildMetricDataQueries(t *testing.T) {
 		"UnHealthyHostCount",
 	}
 	metrics := []types.Metric{}
+	namespace := "AWS/ELB"
 	for i := range metricNames {
 		m := types.Metric{
 			MetricName: &metricNames[i],
+			Namespace:  &namespace,
 		}
 		metrics = append(metrics, m)
 	}

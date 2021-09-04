@@ -44,7 +44,7 @@ func TestBuildLabelBase(t *testing.T) {
 	assert := assert.New(t)
 	namespace := "Test"
 	name := "MetricName"
-	expected := "test.metric_name"
+	expected := "test_metric_name"
 	metric := types.Metric{
 		Namespace:  &namespace,
 		MetricName: &name,
@@ -52,7 +52,7 @@ func TestBuildLabelBase(t *testing.T) {
 	label := BuildLabelBase(metric)
 	namespace = "test/test"
 	name = "MetricName"
-	expected = "test.test.metric_name"
+	expected = "test_test_metric_name"
 	metric = types.Metric{
 		Namespace:  &namespace,
 		MetricName: &name,
@@ -66,7 +66,7 @@ func TestDimString(t *testing.T) {
 	assert := assert.New(t)
 	name := "hey"
 	value := "you"
-	expected := `"hey=you"`
+	expected := `hey="you"`
 	input := []types.Dimension{
 		types.Dimension{
 			Name:  &name,

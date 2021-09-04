@@ -37,9 +37,11 @@ func TestCLBAddMetrics(t *testing.T) {
 		"test",
 	}
 	metrics := []types.Metric{}
+	namespace := "AWS/ELB"
 	for i := range metricNames {
 		m := types.Metric{
 			MetricName: &metricNames[i],
+			Namespace:  &namespace,
 		}
 		metrics = append(metrics, m)
 	}
@@ -65,6 +67,7 @@ func TestCLBAddMetrics(t *testing.T) {
 	for i := range metricNames {
 		m := types.Metric{
 			MetricName: &metricNames[i],
+			Namespace:  &namespace,
 		}
 		metrics = append(metrics, m)
 	}
@@ -96,10 +99,13 @@ func TestCLBBuildMetricDataQueries(t *testing.T) {
 		"SurgeQueueLength",
 		"UnHealthyHostCount",
 	}
+
 	metrics := []types.Metric{}
+	namespace := "AWS/ELB"
 	for i := range metricNames {
 		m := types.Metric{
 			MetricName: &metricNames[i],
+			Namespace:  &namespace,
 		}
 		metrics = append(metrics, m)
 	}

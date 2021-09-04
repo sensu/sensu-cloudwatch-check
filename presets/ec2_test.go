@@ -37,9 +37,11 @@ func TestEC2AddMetrics(t *testing.T) {
 		"test",
 	}
 	metrics := []types.Metric{}
+	namespace := "AWS/EC2"
 	for i := range metricNames {
 		m := types.Metric{
 			MetricName: &metricNames[i],
+			Namespace:  &namespace,
 		}
 		metrics = append(metrics, m)
 	}
@@ -50,6 +52,7 @@ func TestEC2AddMetrics(t *testing.T) {
 	for i := range metricNames {
 		m := types.Metric{
 			MetricName: &metricNames[i],
+			Namespace:  &namespace,
 		}
 		metrics = append(metrics, m)
 	}
@@ -67,9 +70,11 @@ func TestEC2BuildMetricDataQueries(t *testing.T) {
 	assert.NoError(err)
 	metricNames := []string{}
 	metrics := []types.Metric{}
+	namespace := "AWS/EC2"
 	for i := range metricNames {
 		m := types.Metric{
 			MetricName: &metricNames[i],
+			Namespace:  &namespace,
 		}
 		metrics = append(metrics, m)
 	}

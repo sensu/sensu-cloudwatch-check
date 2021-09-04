@@ -37,9 +37,11 @@ func TestCloudFrontAddMetrics(t *testing.T) {
 		"test",
 	}
 	metrics := []types.Metric{}
+	namespace := "AWS/CloudFront"
 	for i := range metricNames {
 		m := types.Metric{
 			MetricName: &metricNames[i],
+			Namespace:  &namespace,
 		}
 		metrics = append(metrics, m)
 	}
@@ -67,9 +69,11 @@ func TestCloudFrontBuildMetricDataQueries(t *testing.T) {
 	assert.NoError(err)
 	metricNames := []string{}
 	metrics := []types.Metric{}
+	namespace := "AWS/CloudFront"
 	for i := range metricNames {
 		m := types.Metric{
 			MetricName: &metricNames[i],
+			Namespace:  &namespace,
 		}
 		metrics = append(metrics, m)
 	}

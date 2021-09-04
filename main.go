@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -331,7 +332,7 @@ func buildGetMetricDataInput(metricDataQueries []types.MetricDataQuery, periodMi
 func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, periodMinutes int) (int, error) {
 	metricQueryMap := make(map[string]MetricQueryMap)
 	unusedQueryMap := make(map[string]MetricQueryMap)
-	outputStrings := []string{}
+	metricOutputStrings := map[string][]string{}
 	dataMessages := []types.MessageData{}
 	numResults := 0
 
@@ -372,9 +373,12 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 					return sensu.CheckStateCritical, nil
 				}
 				delete(unusedQueryMap, *d.Id)
-				outputStrings = append(outputStrings,
-					fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Region: %v Dimensions:%v",
-						q.Label, q.Namespace, q.MetricName, plugin.AWSConfig.Region, common.DimString(q.Dimensions)))
+				metricName := q.MetricName
+				if len(metricOutputStrings[metricName]) == 0 {
+					metricOutputStrings[metricName] = append(metricOutputStrings[metricName],
+						fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Region: %v Dimensions:%v",
+							q.Label, q.Namespace, q.MetricName, plugin.AWSConfig.Region, common.DimString(q.Dimensions)))
+				}
 
 			}
 		} else {
@@ -400,13 +404,18 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 				}
 				if len(d.Timestamps) > 0 {
 					delete(unusedQueryMap, *d.Id)
-					outputStrings = append(outputStrings,
-						fmt.Sprintf("\n# HELP %v Namespace:%v MetricName:%v Region:%v Dimensions:%v",
-							q.Label, q.Namespace, q.MetricName, plugin.AWSConfig.Region, common.DimString(q.Dimensions)))
+					metricName := *q.Metric.MetricName
+					if len(metricOutputStrings[metricName]) == 0 {
+						metricOutputStrings[metricName] = append(metricOutputStrings[metricName],
+							fmt.Sprintf("\n# HELP %v Namespace:%v MetricName:%v Region:%v Dimensions:%v",
+								q.Label, q.Namespace, q.MetricName, plugin.AWSConfig.Region, common.DimString(q.Dimensions)))
+						metricOutputStrings[metricName] = append(metricOutputStrings[metricName],
+							fmt.Sprintf("# TYPE %v gauge", q.Label))
+					}
 					for i := range d.Timestamps {
-						outputStrings = append(outputStrings,
+						metricOutputStrings[metricName] = append(metricOutputStrings[metricName],
 							fmt.Sprintf("%v{%v} %v %v",
-								q.Label, common.DimString(q.Dimensions), d.Values[i], d.Timestamps[i].Unix()))
+								q.Label, common.DimString(q.Dimensions), d.Values[i], d.Timestamps[i].UnixNano()/1000000))
 					}
 				}
 			}
@@ -436,12 +445,23 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 		}
 		warnFlag = true
 	}
+
 	if warnFlag {
 		return sensu.CheckStateWarning, nil
 	}
-	for _, s := range outputStrings {
-		fmt.Println(s)
+	keys := make([]string, 0, len(metricOutputStrings))
+	for k := range metricOutputStrings {
+		keys = append(keys, k)
 	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		m := metricOutputStrings[k]
+		for _, s := range m {
+			fmt.Println(s)
+		}
+
+	}
+
 	return sensu.CheckStateOK, nil
 
 }

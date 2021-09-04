@@ -29,7 +29,7 @@ func BuildLabelBase(m types.Metric) string {
 		s[i] = ToSnakeCase(s[i])
 	}
 
-	labelString := ToSnakeCase(fmt.Sprintf("%v.%v", strings.Join(s, "."), ToSnakeCase(*m.MetricName)))
+	labelString := ToSnakeCase(fmt.Sprintf("%v_%v", strings.Join(s, "_"), ToSnakeCase(*m.MetricName)))
 	return labelString
 }
 
@@ -37,10 +37,10 @@ func DimString(dims []types.Dimension) string {
 	dimStrings := []string{}
 	if len(dims) > 0 {
 		for _, d := range dims {
-			dimStrings = append(dimStrings, fmt.Sprintf(`%v=%v`, *d.Name, *d.Value))
+			dimStrings = append(dimStrings, fmt.Sprintf(`%v="%v"`, *d.Name, *d.Value))
 		}
 	}
-	dimStr := `"` + strings.Join(dimStrings, ",") + `"`
+	dimStr := strings.Join(dimStrings, ",")
 	return dimStr
 }
 
