@@ -21,7 +21,7 @@ import (
 // FIXME: replace s3 specific items with correct AWS service items
 var (
 	nextToken   = false
-	enableQuiet = true
+	enableQuiet = false
 )
 
 type mockService struct {
@@ -114,6 +114,8 @@ func quiet() func() {
 }
 
 func cleanPluginValues() {
+	config := aws.Config{}
+
 	plugin.StatsList = []string{}
 	plugin.Verbose = false
 	plugin.RecentlyActive = false
@@ -124,8 +126,50 @@ func cleanPluginValues() {
 	plugin.MaxPages = 0
 	plugin.PeriodMinutes = 0
 	plugin.PresetName = ""
+	plugin.AWSConfig = &config
 }
 
+func TestQueryMapOutput(t *testing.T) {
+	defer quiet()()
+	cleanPluginValues()
+	plugin.AWSConfig.Region = "us-east-1"
+	cases := []struct {
+		expectedId    string
+		expectedLabel string
+		namespace     string
+		metricName    string
+	}{ //start of array
+		{ //start of struct
+			expectedId:    "test",
+			expectedLabel: "test_label",
+			namespace:     "AWS/Test",
+			metricName:    "TestMetric",
+		},
+	}
+	for i, tt := range cases {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			assert := assert.New(t)
+			q := MetricQueryMap{
+				Id:         tt.expectedId,
+				Label:      tt.expectedLabel,
+				Namespace:  tt.namespace,
+				MetricName: tt.metricName,
+				Dimensions: []types.Dimension{},
+				Metric: &types.Metric{
+					Namespace:  aws.String(tt.namespace),
+					MetricName: aws.String(tt.metricName),
+				},
+			}
+			output, err := q.Output(true, true, true)
+			for _, o := range output {
+				fmt.Println(o)
+			}
+			assert.NoError(err)
+		})
+
+	}
+	cleanPluginValues()
+}
 func TestGetMetricData(t *testing.T) {
 	defer quiet()()
 	cleanPluginValues()
