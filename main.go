@@ -46,12 +46,35 @@ type Config struct {
 }
 
 type MetricQueryMap struct {
-	Id         string
-	Label      string
-	Namespace  string
-	MetricName string
-	Dimensions []types.Dimension
-	Metric     *types.Metric
+	Id               string
+	Label            string
+	Namespace        string
+	MetricName       string
+	Dimensions       []types.Dimension
+	Metric           *types.Metric
+	MetricDataResult types.MetricDataResult
+}
+
+func (q MetricQueryMap) Output(includeHelp bool, includeType bool, includeData bool) ([]string, error) {
+	output := []string{}
+	if includeHelp {
+		output = append(output,
+			fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Region:%v",
+				q.Label, q.Namespace, q.MetricName, plugin.AWSConfig.Region))
+	}
+	if includeType {
+		output = append(output,
+			fmt.Sprintf("# TYPE %v gauge", q.Label))
+	}
+	if includeData {
+		for i := range q.MetricDataResult.Timestamps {
+			output = append(output,
+				fmt.Sprintf("%v{%v} %v %v",
+					q.Label, common.DimString(q.Dimensions), q.MetricDataResult.Values[i], q.MetricDataResult.Timestamps[i].UnixNano()/1000000))
+		}
+	}
+	return output, nil
+
 }
 
 type MetricConfig struct {
@@ -375,9 +398,12 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 				delete(unusedQueryMap, *d.Id)
 				metricName := q.MetricName
 				if len(metricOutputStrings[metricName]) == 0 {
-					metricOutputStrings[metricName] = append(metricOutputStrings[metricName],
-						fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Region: %v Dimensions:%v",
-							q.Label, q.Namespace, q.MetricName, plugin.AWSConfig.Region, common.DimString(q.Dimensions)))
+					output, err := q.Output(true, false, false)
+					if err != nil {
+						fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
+						return sensu.CheckStateCritical, nil
+					}
+					metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
 				}
 
 			}
@@ -398,6 +424,7 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 			for _, d := range dataResult.MetricDataResults {
 				numResults++
 				q, ok := metricQueryMap[*d.Id]
+				q.MetricDataResult = d
 				if !ok {
 					fmt.Printf("Could not look up MetricQuery: %v\n", *d.Id)
 					return sensu.CheckStateCritical, nil
@@ -406,16 +433,19 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 					delete(unusedQueryMap, *d.Id)
 					metricName := *q.Metric.MetricName
 					if len(metricOutputStrings[metricName]) == 0 {
-						metricOutputStrings[metricName] = append(metricOutputStrings[metricName],
-							fmt.Sprintf("\n# HELP %v Namespace:%v MetricName:%v Region:%v Dimensions:%v",
-								q.Label, q.Namespace, q.MetricName, plugin.AWSConfig.Region, common.DimString(q.Dimensions)))
-						metricOutputStrings[metricName] = append(metricOutputStrings[metricName],
-							fmt.Sprintf("# TYPE %v gauge", q.Label))
-					}
-					for i := range d.Timestamps {
-						metricOutputStrings[metricName] = append(metricOutputStrings[metricName],
-							fmt.Sprintf("%v{%v} %v %v",
-								q.Label, common.DimString(q.Dimensions), d.Values[i], d.Timestamps[i].UnixNano()/1000000))
+						output, err := q.Output(true, true, true)
+						if err != nil {
+							fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
+							return sensu.CheckStateCritical, nil
+						}
+						metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
+					} else {
+						output, err := q.Output(false, false, true)
+						if err != nil {
+							fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
+							return sensu.CheckStateCritical, nil
+						}
+						metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
 					}
 				}
 			}
