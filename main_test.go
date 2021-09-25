@@ -280,6 +280,9 @@ func TestCheckArgs(t *testing.T) {
 		assert.Equal(state, 1)
 	})
 	plugin.DryRun = true
+	plugin.AWSCredentialsFiles = []string{
+		"./testingdata/credentials",
+	}
 	t.Run("CheckArgs", func(t *testing.T) {
 		state, err := checkArgs(nil)
 		assert.NoError(err)
