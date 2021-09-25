@@ -50,6 +50,7 @@ func TestBuildLabelBase(t *testing.T) {
 		MetricName: &name,
 	}
 	label := BuildLabelBase(metric)
+	assert.Equal(expected, label)
 	namespace = "test/test"
 	name = "MetricName"
 	expected = "test_test_metric_name"

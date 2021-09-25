@@ -76,9 +76,7 @@ type MeasurementJSON struct {
 }
 
 func (p *Preset) AddDimensionFilters(filters []types.DimensionFilter) error {
-	for _, f := range filters {
-		p.DimensionFilters = append(p.DimensionFilters, f)
-	}
+	p.DimensionFilters = append(p.DimensionFilters, filters...)
 	return nil
 }
 
@@ -135,7 +133,11 @@ func (p *Preset) BuildMeasurementConfig() error {
 	}
 	if len(measurementConfig.DimensionFilters) > 0 {
 		if dimensionFilters, err := common.BuildDimensionFilters(measurementConfig.DimensionFilters); err == nil {
-			p.AddDimensionFilters(dimensionFilters)
+			err := p.AddDimensionFilters(dimensionFilters)
+			if err != nil {
+				return err
+			}
+
 		} else {
 			return err
 		}
@@ -209,7 +211,7 @@ func (p *Preset) AddMetrics(metrics []types.Metric) error {
 	errStrings := []string{}
 	for _, m := range metrics {
 		if m.MetricName == nil {
-			str := fmt.Sprintf("Preset.AddMetrics: MetricName missing in metric\n")
+			str := "Preset.AddMetrics: MetricName missing in metric"
 			if p.verbose {
 				fmt.Println(str)
 			}
@@ -217,7 +219,7 @@ func (p *Preset) AddMetrics(metrics []types.Metric) error {
 			continue
 		}
 		if m.Namespace == nil {
-			str := fmt.Sprintf("Preset.AddMetrics: Namespace missing in metric\n")
+			str := "Preset.AddMetrics: Namespace missing in metric"
 			if p.verbose {
 				fmt.Println(str)
 			}

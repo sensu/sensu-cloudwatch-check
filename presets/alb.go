@@ -508,7 +508,7 @@ func (p *ALB) Ready() error {
 }
 `
 	p.measurementString = measurementString
-	p.BuildMeasurementConfig()
+	err := p.BuildMeasurementConfig()
 
-	return nil
+	return err
 }

@@ -25,7 +25,7 @@ func BuildLabelBase(m types.Metric) string {
 	if m.Namespace != nil {
 		s = strings.Split(*m.Namespace, "/")
 	}
-	for i, _ := range s {
+	for i := range s {
 		s[i] = ToSnakeCase(s[i])
 	}
 
@@ -66,7 +66,7 @@ func RemoveDuplicateStrings(elements []string) []string {
 	result := []string{}
 
 	for v := range elements {
-		if encountered[elements[v]] == true {
+		if encountered[elements[v]] {
 			// Do not add duplicate.
 		} else {
 			// Record this element as an encountered element.

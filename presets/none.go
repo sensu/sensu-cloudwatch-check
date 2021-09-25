@@ -53,13 +53,13 @@ func (p *None) BuildMeasurementString() error {
 		dimStrings = append(dimStrings, output)
 	}
 	measurementConfig.DimensionFilters = dimStrings
-	for i, _ := range p.Metrics {
+	for i := range p.Metrics {
 		config := MeasurementConfig{
 			MetricName: *p.Metrics[i].MetricName,
 			Config:     []StatConfig{},
 		}
 
-		for j, _ := range p.Stats {
+		for j := range p.Stats {
 			labelString := fmt.Sprintf("%v.%v", common.BuildLabelBase(p.Metrics[i]), common.ToSnakeCase(p.Stats[j]))
 			s := StatConfig{
 				Stat:        p.Stats[j],
@@ -76,20 +76,16 @@ func (p *None) BuildMeasurementString() error {
 	} else {
 		p.measurementString = string(output)
 		return nil
-
 	}
-
-	return nil
 }
 
 func (p *None) AddStats(stats []string) {
 	if p.verbose {
 		fmt.Println("None::AddStats", stats)
 	}
-	for i, _ := range stats {
+	for i := range stats {
 		p.Stats = append(p.Stats, strings.TrimSpace(stats[i]))
 	}
-	return
 }
 
 func (p *None) GetMetricFilter() string {
@@ -111,9 +107,7 @@ func (p *None) AddMetrics(metrics []types.Metric) error {
 	if p.verbose {
 		fmt.Println("None::AddMetrics", len(metrics))
 	}
-	for _, m := range metrics {
-		p.Metrics = append(p.Metrics, m)
-	}
+	p.Metrics = append(p.Metrics, metrics...)
 	return nil
 }
 
@@ -122,8 +116,8 @@ func (p *None) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, er
 		fmt.Println("None::BuildMetricDataQueries")
 	}
 	dataQueries := []types.MetricDataQuery{}
-	for i, _ := range p.Metrics {
-		for j, _ := range p.Stats {
+	for i := range p.Metrics {
+		for j := range p.Stats {
 			id := uuid.New()
 			idString := "aws_" + strings.ReplaceAll(id.String(), "-", "_")
 			labelString := fmt.Sprintf("%v.%v", common.BuildLabelBase(p.Metrics[i]), common.ToSnakeCase(p.Stats[j]))

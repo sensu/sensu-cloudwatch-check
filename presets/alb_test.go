@@ -93,7 +93,8 @@ func TestALBBuildMetricDataQueries(t *testing.T) {
 	}
 	err = elb.AddMetrics(metrics)
 	assert.NoError(err)
-	elb.BuildMetricDataQueries(int32(1))
+	_, err = elb.BuildMetricDataQueries(int32(1))
+	assert.NoError(err)
 }
 
 func TestALBGetMeasurementString(t *testing.T) {

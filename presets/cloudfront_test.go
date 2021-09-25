@@ -79,7 +79,8 @@ func TestCloudFrontBuildMetricDataQueries(t *testing.T) {
 	}
 	err = preset.AddMetrics(metrics)
 	assert.NoError(err)
-	preset.BuildMetricDataQueries(int32(1))
+	_, err = preset.BuildMetricDataQueries(int32(1))
+	assert.NoError(err)
 }
 
 func TestCloudFrontGetMeasurementString(t *testing.T) {

@@ -77,14 +77,6 @@ func (q MetricQueryMap) Output(includeHelp bool, includeType bool, includeData b
 
 }
 
-type MetricConfig struct {
-	Measurement      string   `json:"measurement"`
-	Namespace        string   `json:"namespace"`
-	MetricName       string   `json:"metric-name"`
-	Stat             string   `json:"stat"`
-	DimensionFilters []string `json:"dimension-filters"`
-}
-
 var (
 	//initialize Sensu plugin Config object
 	plugin = Config{
@@ -253,9 +245,17 @@ func checkArgs(event *v2.Event) (int, error) {
 			plugin.PresetName = "Custom"
 			p := presets.Preset{Description: "Custom Config"}
 
-			p.SetMeasurementString(plugin.ConfigString)
+			err := p.SetMeasurementString(plugin.ConfigString)
+			if err != nil {
+				fmt.Println("Preset SetMeasurementString error")
+				return sensu.CheckStateCritical, nil
+			}
 			plugin.Preset = &p
-			plugin.Preset.BuildMeasurementConfig()
+			err = plugin.Preset.BuildMeasurementConfig()
+			if err != nil {
+				fmt.Println("Preset BuildMeasurementConfig error")
+				return sensu.CheckStateCritical, nil
+			}
 
 		} else {
 			return sensu.CheckStateWarning, fmt.Errorf(`ConfigString not None Preset`)
@@ -270,15 +270,39 @@ func checkArgs(event *v2.Event) (int, error) {
 	}
 	if plugin.PresetName == "None" {
 		none := &presets.None{}
-		none.SetVerbose(plugin.Verbose)
-		none.SetPeriodMinutes(plugin.PeriodMinutes)
-		none.SetRegion(plugin.AWSRegion)
-		none.Ready()
+		err := none.SetVerbose(plugin.Verbose)
+		if err != nil {
+			fmt.Println("Preset SetVerbose error")
+			return sensu.CheckStateCritical, nil
+		}
+		err = none.SetPeriodMinutes(plugin.PeriodMinutes)
+		if err != nil {
+			fmt.Println("Preset SetPeriodMinutes error")
+			return sensu.CheckStateCritical, nil
+		}
+		err = none.SetRegion(plugin.AWSRegion)
+		if err != nil {
+			fmt.Println("Preset SetRegion error")
+			return sensu.CheckStateCritical, nil
+		}
+		err = none.Ready()
+		if err != nil {
+			fmt.Println("Preset Ready error")
+			return sensu.CheckStateCritical, nil
+		}
 		none.Namespace = plugin.Namespace
 		none.AddStats(plugin.StatsList)
 		if len(plugin.ConfigString) > 0 {
-			none.SetMeasurementString(plugin.ConfigString)
-			none.BuildMeasurementConfig()
+			err = none.SetMeasurementString(plugin.ConfigString)
+			if err != nil {
+				fmt.Println("Preset SetMeasurementString error")
+				return sensu.CheckStateCritical, nil
+			}
+			err = none.BuildMeasurementConfig()
+			if err != nil {
+				fmt.Println("Preset BuildMeasurementConfig error")
+				return sensu.CheckStateCritical, nil
+			}
 		}
 		plugin.Preset = none
 	}
@@ -501,10 +525,26 @@ func checkFunction(client ServiceAPI) (int, error) {
 	var metricDataQueries []types.MetricDataQuery
 	numMetrics := 0
 	numPages := 0
-	plugin.Preset.AddDimensionFilters(plugin.DimensionFilters)
-	plugin.Preset.SetMetricFilter(plugin.MetricName)
-	plugin.Preset.SetVerbose(plugin.Verbose)
-	plugin.Preset.Ready()
+	err = plugin.Preset.AddDimensionFilters(plugin.DimensionFilters)
+	if err != nil {
+		fmt.Println("Preset AddDimensionFilters error")
+		return sensu.CheckStateCritical, nil
+	}
+	err = plugin.Preset.SetMetricFilter(plugin.MetricName)
+	if err != nil {
+		fmt.Println("Preset SetMetricFilter error")
+		return sensu.CheckStateCritical, nil
+	}
+	err = plugin.Preset.SetVerbose(plugin.Verbose)
+	if err != nil {
+		fmt.Println("Preset SetVerbose error")
+		return sensu.CheckStateCritical, nil
+	}
+	err = plugin.Preset.Ready()
+	if err != nil {
+		fmt.Println("Preset Ready error")
+		return sensu.CheckStateCritical, nil
+	}
 	//List Metrics result page loop
 
 	for getList := true; getList && (plugin.MaxPages == 0 || numPages < plugin.MaxPages); {
@@ -526,7 +566,11 @@ func checkFunction(client ServiceAPI) (int, error) {
 			input.NextToken = listResult.NextToken
 		}
 
-		plugin.Preset.AddMetrics(listResult.Metrics)
+		err = plugin.Preset.AddMetrics(listResult.Metrics)
+		if err != nil {
+			fmt.Println("Preset AddMetrics error")
+			return sensu.CheckStateCritical, nil
+		}
 
 		numMetrics += len(listResult.Metrics)
 

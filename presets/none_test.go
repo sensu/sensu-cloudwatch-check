@@ -76,7 +76,8 @@ func TestNoneBuildMetricDataQueries(t *testing.T) {
 	none.AddStats(stats)
 	err = none.AddMetrics(metrics)
 	assert.NoError(err)
-	none.BuildMetricDataQueries(int32(1))
+	_, err = none.BuildMetricDataQueries(int32(1))
+	assert.NoError(err)
 
 }
 
