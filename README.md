@@ -11,13 +11,12 @@
   - [Help output](#help-output)
   - [Environment Variables](#environment-variables)
   - [Basic Usage](#basic-usage)
-  - [Important Commandline Arguments](#important-commendline-arguments)
-  - [Presets](#presets)
+  - [Important Commandline Arguments](#important-commandline-arguments)
+  - [AWS CloudWatch Metrics Presets](#aws-cloudwatch-metrics-presets)
   - [Custom Presets](#custom-presets)
   - [Exporting Preset Configuration](#exporting-preset-configuration)
 
 - [Configuration](#configuration)
-  - [AWS credentials](#AWS-credentials)
   - [Asset registration](#asset-registration)
   - [Check definition](#check-definition)
 - [Installation from source](#installation-from-source)
@@ -66,18 +65,18 @@ Flags:
 
 ### Environment Variables
 
-|Argument                       |Environment Variable                 |
-|-------------------------------|-------------------------------------|
-|--region                       |AWS_REGION                           |
-|--profile                      |AWS_PROFILE                          |
-|--namespace                    | CLOUDWATCH_CHECK_NAMESPACE          |
-|--metric-filter                | CLOUDWATCH_CHECK_METRIC_FILTER      | 
-|--dimension-filters            | CLOUDWATCH_CHECK_DIMENSION_FILTERS  |
-|--stats                        | CLOUDWATCH_CHECK_STATS              |
-|--config                       | CLOUDWATCH_CHECK_CONFIG             |
-|--preset                       | CLOUDWATCH_CHECK_PRESET             |
-|--max-pages                    | CLOUDWATCH_CHECK_MAX_PAGES          |
-|--period-minutes               | CLOUDWATCH_CHECK_PERIOD_MINUTES     |
+| Argument            | Environment Variable               |
+|---------------------|------------------------------------|
+| --region            | AWS_REGION                         |
+| --profile           | AWS_PROFILE                        |
+| --namespace         | CLOUDWATCH_CHECK_NAMESPACE         |
+| --metric-filter     | CLOUDWATCH_CHECK_METRIC_FILTER     | 
+| --dimension-filters | CLOUDWATCH_CHECK_DIMENSION_FILTERS |
+| --stats             | CLOUDWATCH_CHECK_STATS             |
+| --config            | CLOUDWATCH_CHECK_CONFIG            |
+| --preset            | CLOUDWATCH_CHECK_PRESET            |
+| --max-pages         | CLOUDWATCH_CHECK_MAX_PAGES         |
+| --period-minutes    | CLOUDWATCH_CHECK_PERIOD_MINUTES    |
 
   
 ### Basic Usage
@@ -125,12 +124,12 @@ This check comes with several presets for specific AWS Services.  These presets 
 
 The list of existing service presets includes:
 
-| Preset Name      |Description                 |
-|------------------|----------------------------|
-| ALB              | Preset Metrics for AWS Application Load Balancer            |
-| CLB              | Preset Metrics for AWS Classic Load Balancer                |
-| EC2              | Preset Metrics for AWS EC2                                  |
-| CloudFront       | Preset Metrics for AWS CloudFront. Note: requires --region us-east-1 |
+| Preset Name | Description                                                          |
+|-------------|----------------------------------------------------------------------|
+| ALB         | Preset Metrics for AWS Application Load Balancer                     |
+| CLB         | Preset Metrics for AWS Classic Load Balancer                         |
+| EC2         | Preset Metrics for AWS EC2                                           |
+| CloudFront  | Preset Metrics for AWS CloudFront. Note: requires --region us-east-1 |
 
 *Note:* The --dimension-filters and --metric-filter arguments can be used to further narrow the results
 from the service presets.
@@ -144,7 +143,8 @@ or `CLOUDWATCH_CHECK_CONFIG` envvar.
 ### Exporting Preset Configuration
 
 The `--output-config` option can be used to generate the json representation of a metric query. 
-This json can be editted as needed to customize the metric query. 
+This json can be edited as needed to customize the metric query. 
+
 #### Export examples 
 
 Output a simple `AWS/EC2` namespace metrics configuration
@@ -161,7 +161,6 @@ Output the EC2 preset configuration
 ```
 sensu-cloudwatch-check -P "EC2" --region "us-east-1" --output-config
 ```
-
 
 ## Configuration
 

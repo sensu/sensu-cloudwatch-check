@@ -56,15 +56,16 @@ type MetricQueryMap struct {
 }
 
 func (q MetricQueryMap) Output(includeHelp bool, includeType bool, includeData bool) ([]string, error) {
-	output := []string{}
+	output := make([]string, 0)
+	baseLabel := getBaseLabel(q.Label)
 	if includeHelp {
 		output = append(output,
 			fmt.Sprintf("# HELP %v Namespace:%v MetricName:%v Region:%v",
-				q.Label, q.Namespace, q.MetricName, plugin.AWSConfig.Region))
+				baseLabel, q.Namespace, q.MetricName, plugin.AWSConfig.Region))
 	}
 	if includeType {
 		output = append(output,
-			fmt.Sprintf("# TYPE %v gauge", q.Label))
+			fmt.Sprintf("# TYPE %v gauge", baseLabel))
 	}
 	if includeData {
 		for i := range q.MetricDataResult.Timestamps {
@@ -75,6 +76,14 @@ func (q MetricQueryMap) Output(includeHelp bool, includeType bool, includeData b
 	}
 	return output, nil
 
+}
+
+func getBaseLabel(label string) string {
+	last := strings.LastIndex(label, "_")
+	if last > 0 {
+		return label[0:last]
+	}
+	return label
 }
 
 var (
@@ -88,15 +97,14 @@ var (
 	}
 	//initialize options list with custom options
 	options = []*sensu.PluginConfigOption{
-		&sensu.PluginConfigOption{
+		{
+			Value:     &plugin.OutputConfig,
 			Path:      "output-config",
 			Argument:  "output-config",
 			Shorthand: "o",
 			Default:   false,
 			Usage:     "Output measurement configuration JSON string",
-			Value:     &plugin.OutputConfig,
-		},
-		&sensu.PluginConfigOption{
+		}, {
 			Path:      "config",
 			Argument:  "config",
 			Env:       "CLOUDWATCH_CHECK_CONFIG",
@@ -105,15 +113,13 @@ var (
 			Usage:     "The measurement configuration JSON string to use",
 			Value:     &plugin.ConfigString,
 		},
-
-		&sensu.PluginConfigOption{
+		{
 			Path:     "recently-active",
 			Argument: "recently-active",
 			Default:  false,
 			Usage:    "Only include metrics recently active in aprox last 3 hours",
 			Value:    &plugin.RecentlyActive,
-		},
-		&sensu.PluginConfigOption{
+		}, {
 			Path:      "namespace",
 			Argument:  "namespace",
 			Env:       "CLOUDWATCH_CHECK_NAMESPACE",
@@ -121,8 +127,7 @@ var (
 			Default:   "",
 			Usage:     "Cloudwatch Metric Namespace",
 			Value:     &plugin.Namespace,
-		},
-		&sensu.PluginConfigOption{
+		}, {
 			Path:      "dimension-filters",
 			Argument:  "dimension-filters",
 			Env:       "CLOUDWATCH_CHECK_DIMENSION_FILTERS",
@@ -130,8 +135,7 @@ var (
 			Default:   []string{},
 			Usage:     `Comma separated list of AWS Cloudwatch Dimension Filters Ex: "Name, SecondName=SecondValue"`,
 			Value:     &plugin.DimensionFilterStrings,
-		},
-		&sensu.PluginConfigOption{
+		}, {
 			Path:      "stats",
 			Argument:  "stats",
 			Env:       "CLOUDWATCH_CHECK_STATS",
@@ -139,8 +143,7 @@ var (
 			Default:   []string{"Average", "Sum", "SampleCount", "Maximum", "Minimum"},
 			Usage:     `Comma separated list of AWS Cloudwatch Status Ex: "Average, Sum"`,
 			Value:     &plugin.StatsList,
-		},
-		&sensu.PluginConfigOption{
+		}, {
 			Path:      "metric-filter",
 			Argument:  "metric-filter",
 			Env:       "CLOUDWATCH_CHECK_METRIC_FILTER",
@@ -148,8 +151,7 @@ var (
 			Default:   "",
 			Usage:     "Cloudwatch Metric Filter, limit result to given Metric name",
 			Value:     &plugin.MetricName,
-		},
-		&sensu.PluginConfigOption{
+		}, {
 			Path:      "preset",
 			Argument:  "preset",
 			Env:       "CLOUDWATCH_CHECK_PRESET",
@@ -157,8 +159,7 @@ var (
 			Default:   "None",
 			Usage:     "The service preset to use",
 			Value:     &plugin.PresetName,
-		},
-		&sensu.PluginConfigOption{
+		}, {
 			Path:      "max-pages",
 			Argument:  "max-pages",
 			Env:       "CLOUDWATCH_CHECK_MAX_PAGES",
@@ -166,8 +167,7 @@ var (
 			Default:   1,
 			Usage:     "Maximum number of result pages. A zero value will disable the limit",
 			Value:     &plugin.MaxPages,
-		},
-		&sensu.PluginConfigOption{
+		}, {
 			Path:      "period-minutes",
 			Argument:  "period-minutes",
 			Env:       "CLOUDWATCH_CHECK_PERIOD_MINUTES",
@@ -175,16 +175,14 @@ var (
 			Default:   1,
 			Usage:     "Previous number of minutes to consider for metrics statistic calculation",
 			Value:     &plugin.PeriodMinutes,
-		},
-		&sensu.PluginConfigOption{
+		}, {
 			Path:      "verbose",
 			Argument:  "verbose",
 			Shorthand: "v",
 			Default:   false,
 			Usage:     "Enable verbose output",
 			Value:     &plugin.Verbose,
-		},
-		&sensu.PluginConfigOption{
+		}, {
 			Path:      "dry-run",
 			Argument:  "dry-run",
 			Shorthand: "n",
@@ -196,7 +194,7 @@ var (
 )
 
 func init() {
-	//append common AWS options to options list
+	//append common AWS options to option list
 	options = append(options, plugin.GetAWSOpts()...)
 }
 
@@ -205,7 +203,7 @@ func main() {
 	check.Execute()
 }
 
-func checkArgs(event *v2.Event) (int, error) {
+func checkArgs(_ *v2.Event) (int, error) {
 
 	// Specific Argument Checking for this command
 	if plugin.Verbose {
@@ -224,7 +222,7 @@ func checkArgs(event *v2.Event) (int, error) {
 			plugin.Preset = p
 		} else {
 			keys := reflect.ValueOf(presets.Presets).MapKeys()
-			strArr := []string{}
+			strArr := make([]string, 0)
 			for _, key := range keys {
 				str := fmt.Sprintf(" %v : %v\n", key.String(), presets.Presets[key.String()].GetDescription())
 				strArr = append(strArr, str)
@@ -233,11 +231,11 @@ func checkArgs(event *v2.Event) (int, error) {
 			return sensu.CheckStateWarning, err
 		}
 	} else {
-		err := fmt.Errorf("No Preset selected")
+		err := fmt.Errorf("no preset selected")
 		return sensu.CheckStateWarning, err
 	}
 	if plugin.Preset == nil {
-		err := fmt.Errorf("No Preset selected")
+		err := fmt.Errorf("no preset selected")
 		return sensu.CheckStateWarning, err
 	}
 	if len(plugin.ConfigString) > 0 {
@@ -265,7 +263,7 @@ func checkArgs(event *v2.Event) (int, error) {
 	if len(plugin.PresetName) == 0 || plugin.PresetName == "None" {
 		// If haven't selected a cloudwatch filter argument switch to dryrun to avoid pulling data for all metrics
 		if len(plugin.ConfigString) == 0 && len(plugin.Namespace) == 0 && len(plugin.MetricName) == 0 && !plugin.DryRun {
-			return sensu.CheckStateWarning, fmt.Errorf("Must select at least one of: --config, --namespace, --metric, or --dry-run")
+			return sensu.CheckStateWarning, fmt.Errorf("must select at least one of: --config, --namespace, --metric, or --dry-run")
 		}
 	}
 	if plugin.PresetName == "None" {
@@ -320,7 +318,7 @@ func checkArgs(event *v2.Event) (int, error) {
 	return sensu.CheckStateOK, nil
 }
 
-func executeCheck(event *v2.Event) (int, error) {
+func executeCheck(_ *v2.Event) (int, error) {
 	//Make sure plugin.CheckAwsCreds() worked as expected
 	if plugin.AWSConfig == nil {
 		return sensu.CheckStateCritical, fmt.Errorf("AWS Config undefined, something went wrong in processing AWS configuration information")
@@ -332,7 +330,7 @@ func executeCheck(event *v2.Event) (int, error) {
 	return state, err
 }
 
-//Create service interface to help with mock testing
+// ServiceAPI creates a service interface to help with mock testing
 type ServiceAPI interface {
 	ListMetrics(ctx context.Context,
 		params *cloudwatch.ListMetricsInput,
@@ -380,7 +378,7 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 	metricQueryMap := make(map[string]MetricQueryMap)
 	unusedQueryMap := make(map[string]MetricQueryMap)
 	metricOutputStrings := map[string][]string{}
-	dataMessages := []types.MessageData{}
+	dataMessages := make([]types.MessageData, 0)
 	numResults := 0
 
 	for _, d := range metricDataQueries {
@@ -607,7 +605,7 @@ func checkFunction(client ServiceAPI) (int, error) {
 		if state, err := getData(client, metricDataQueries, periodMinutes); state != sensu.CheckStateOK {
 			return state, err
 		}
-		// Outputing Metrics
+		// Outputting Metrics
 		if plugin.MaxPages > 0 && numPages > plugin.MaxPages {
 			fmt.Printf("\n# Warning: max allowed ListMetrics result pages (%v) exceeded, either filter via --namespace or --metric option or increase --max-pages value\n",
 				plugin.MaxPages)

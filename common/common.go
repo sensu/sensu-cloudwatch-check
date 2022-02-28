@@ -34,7 +34,7 @@ func BuildLabelBase(m types.Metric) string {
 }
 
 func DimString(dims []types.Dimension) string {
-	dimStrings := []string{}
+	dimStrings := make([]string, 0, len(dims))
 	if len(dims) > 0 {
 		for _, d := range dims {
 			dimStrings = append(dimStrings, fmt.Sprintf(`%v="%v"`, *d.Name, *d.Value))
@@ -45,11 +45,11 @@ func DimString(dims []types.Dimension) string {
 }
 
 func BuildDimensionFilters(input []string) ([]types.DimensionFilter, error) {
-	output := []types.DimensionFilter{}
+	output := make([]types.DimensionFilter, 0, len(input))
 	for _, item := range input {
 		segments := strings.Split(strings.TrimSpace(item), "=")
 		if len(segments) < 1 || len(segments) > 2 {
-			return nil, fmt.Errorf("Error parsing dimension filters")
+			return nil, fmt.Errorf("error parsing dimension filters")
 		}
 		filter := types.DimensionFilter{Name: &segments[0]}
 		if len(segments) > 1 {
@@ -63,7 +63,7 @@ func BuildDimensionFilters(input []string) ([]types.DimensionFilter, error) {
 func RemoveDuplicateStrings(elements []string) []string {
 	// Use map to record duplicates as we find them.
 	encountered := map[string]bool{}
-	result := []string{}
+	result := make([]string, 0)
 
 	for v := range elements {
 		if encountered[elements[v]] {

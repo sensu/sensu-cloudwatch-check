@@ -6,7 +6,7 @@ type CloudFront struct {
 	Preset
 }
 
-// Overwrite the Preset Ready function to enforce specific behavior
+// Ready overwrites the Preset Ready function to enforce specific behavior
 func (p *CloudFront) Ready() error {
 	if p.verbose {
 		fmt.Println("CloudFront::Ready Setting up presets")
