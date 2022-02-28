@@ -120,7 +120,7 @@ func (p *None) BuildMetricDataQueries(period int32) ([]types.MetricDataQuery, er
 		for j := range p.Stats {
 			id := uuid.New()
 			idString := "aws_" + strings.ReplaceAll(id.String(), "-", "_")
-			labelString := fmt.Sprintf("%v.%v", common.BuildLabelBase(p.Metrics[i]), common.ToSnakeCase(p.Stats[j]))
+			labelString := fmt.Sprintf("%v_%v", common.BuildLabelBase(p.Metrics[i]), common.ToSnakeCase(p.Stats[j]))
 			dataQuery := types.MetricDataQuery{
 				Id:    &idString,
 				Label: &labelString,
