@@ -31,6 +31,8 @@ func TestCloudFrontAddMetrics(t *testing.T) {
 	preset := &CloudFront{}
 	err := preset.SetVerbose(true)
 	assert.NoError(err)
+        err = preset.SetErrorOnMissing(true)
+        assert.NoError(err)
 	err = preset.Ready()
 	assert.NoError(err)
 	metricNames := []string{

@@ -36,6 +36,8 @@ func TestEC2AddMetrics(t *testing.T) {
 	metricNames := []string{
 		"test",
 	}
+	err = preset.SetErrorOnMissing(true)
+	assert.NoError(err)
 	metrics := []types.Metric{}
 	namespace := "AWS/EC2"
 	for i := range metricNames {
