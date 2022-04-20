@@ -31,6 +31,8 @@ func TestALBAddMetrics(t *testing.T) {
 	elb := &ALB{}
 	err := elb.SetVerbose(true)
 	assert.NoError(err)
+        err = elb.SetErrorOnMissing(true)
+        assert.NoError(err)
 	err = elb.Ready()
 	assert.NoError(err)
 	metricNames := []string{

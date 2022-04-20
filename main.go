@@ -34,6 +34,7 @@ type Config struct {
 	DimensionFilterStrings []string
 	DimensionFilters       []types.DimensionFilter
 	Verbose                bool
+	ErrorOnMissing         bool
 	DryRun                 bool
 	RecentlyActive         bool
 	MaxPages               int
@@ -182,6 +183,14 @@ var (
 			Default:   false,
 			Usage:     "Enable verbose output",
 			Value:     &plugin.Verbose,
+		}, {
+			Path:      "error-on-missing",
+			Argument:  "error-on-missing",
+			Shorthand: "",
+			Default:   false,
+			Env:       "CLOUDWATCH_CHECK_ERROR_ON_MISSING",
+			Usage:     "Error if requested metrics configuration is missing a known metric from the AWS service metric list",
+			Value:     &plugin.ErrorOnMissing,
 		}, {
 			Path:      "dry-run",
 			Argument:  "dry-run",
@@ -536,6 +545,11 @@ func checkFunction(client ServiceAPI) (int, error) {
 	err = plugin.Preset.SetVerbose(plugin.Verbose)
 	if err != nil {
 		fmt.Println("Preset SetVerbose error")
+		return sensu.CheckStateCritical, nil
+	}
+	err = plugin.Preset.SetErrorOnMissing(plugin.ErrorOnMissing)
+	if err != nil {
+		fmt.Println("Preset SetErrorOnMissing error")
 		return sensu.CheckStateCritical, nil
 	}
 	err = plugin.Preset.Ready()

@@ -31,6 +31,8 @@ func TestCLBAddMetrics(t *testing.T) {
 	preset := &CLB{}
 	err := preset.SetVerbose(true)
 	assert.NoError(err)
+        err = preset.SetErrorOnMissing(true)
+        assert.NoError(err)
 	err = preset.Ready()
 	assert.NoError(err)
 	metricNames := []string{

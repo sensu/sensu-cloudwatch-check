@@ -48,7 +48,7 @@ Flags:
       --profile string              AWS Credential Profile (for security use envvar AWS_PROFILE)
   -c, --config string               Use measurement configuration JSON string
   -N, --namespace string            Cloudwatch Metric Namespace
-  -D, --dimension-filters strings    Comma separated list of AWS Cloudwatch Dimension Filters Ex: "Name, SecondName=SecondValue"
+  -D, --dimension-filters strings   Comma separated list of AWS Cloudwatch Dimension Filters Ex: "Name, SecondName=SecondValue"
   -M, --metric string               Cloudwatch Metric Name
   -S, --stats strings               Comma separated list of AWS Cloudwatch Status Ex: "Average, Sum" (default [Average,Sum,SampleCount,Maximum,Minimum])
   -m, --max-pages int               Maximum number of result pages. A zero value will disable the limit (default 1)
@@ -58,6 +58,7 @@ Flags:
       --recently-active             Only include metrics recently active in aprox last 3 hours
       --region string               AWS Region to use, (or set envvar AWS_REGION)
   -v, --verbose                     Enable verbose output
+      --error-on-missing            Error if requested metrics configuration is missing a known metric from the AWS service metric list
   -n, --dry-run                     Dryrun only list metrics, do not get metrics data
   -h, --help                        help for sensu-cloudwatch-check
 
@@ -77,7 +78,7 @@ Flags:
 | --preset            | CLOUDWATCH_CHECK_PRESET            |
 | --max-pages         | CLOUDWATCH_CHECK_MAX_PAGES         |
 | --period-minutes    | CLOUDWATCH_CHECK_PERIOD_MINUTES    |
-
+| --error-on-missing  | CLOUDWATCH_CHECK_ERROR_ON_MISSING  |
   
 ### Basic Usage
 To retrieve all available metrics from a specific AWS service from a particular region is to specific the 

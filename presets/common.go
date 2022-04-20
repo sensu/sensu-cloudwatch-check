@@ -35,6 +35,7 @@ type Preset struct {
 	configMap         map[string][]StatConfig
 	measurementString string
 	verbose           bool
+	errorOnMissing    bool
 }
 
 type PresetInterface interface {
@@ -49,6 +50,7 @@ type PresetInterface interface {
 	GetRegion() string
 	SetRegion(region string) error
 	SetVerbose(flag bool) error
+	SetErrorOnMissing(flag bool) error
 	SetMeasurementString(config string) error
 	BuildMeasurementConfig() error
 	GetMeasurementString(pretty bool) (string, error)
@@ -195,6 +197,11 @@ func (p *Preset) SetVerbose(flag bool) error {
 	return nil
 }
 
+func (p *Preset) SetErrorOnMissing(flag bool) error {
+	p.errorOnMissing = flag
+	return nil
+}
+
 func (p *Preset) SetMeasurementString(config string) error {
 	p.measurementString = config
 	return nil
@@ -250,7 +257,9 @@ func (p *Preset) AddMetrics(metrics []types.Metric) error {
 			if p.verbose {
 				fmt.Println(str)
 			}
-			errStrings = append(errStrings, str)
+                        if p.errorOnMissing {
+			   errStrings = append(errStrings, str)
+                        }
 		}
 	}
 	if len(errStrings) > 0 {
