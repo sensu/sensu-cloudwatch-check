@@ -22,53 +22,6 @@ type AWSPluginConfig struct {
 	AWSCredentials      *aws.Credentials
 }
 
-/*
-
-func (plugin *AWSPluginConfig) GetAWSOpts() []sensu.PluginConfigOption {
-	awsOpts := []sensu.ConfigOption{
-		&sensu.PluginConfigOption[string]{
-			Path:      "region",
-			Env:       "AWS_REGION",
-			Argument:  "region",
-			Shorthand: "",
-			Default:   "",
-			Usage:     "AWS Region to use, (or set envvar AWS_REGION)",
-			Value:     &plugin.AWSRegion,
-		},
-		&sensu.PluginConfigOption[string]{
-			Path:      "profile",
-			Env:       "AWS_PROFILE",
-			Argument:  "profile",
-			Shorthand: "",
-			Default:   "",
-			Usage:     "AWS Credential Profile (for security use envvar AWS_PROFILE)",
-			Secret:    false,
-			Value:     &plugin.AWSProfile,
-		},
-		&sensu.PluginConfigOption[[]string]{
-			Path:      "config-files",
-			Env:       "",
-			Argument:  "config-files",
-			Shorthand: "",
-			Default:   []string{},
-			Usage:     "comma separated list of AWS config files",
-			Secret:    false,
-			Value:     &plugin.AWSConfigFiles,
-		},
-		&sensu.PluginConfigOption[[]string]{
-			Path:      "credentials-files",
-			Env:       "",
-			Argument:  "credentials-files",
-			Shorthand: "",
-			Default:   []string{},
-			Usage:     "comma separated list of AWS Credential files",
-			Secret:    false,
-			Value:     &plugin.AWSCredentialsFiles,
-		},
-	}
-	return awsOpts
-}
-*/
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
 	if os.IsNotExist(err) {

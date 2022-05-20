@@ -67,7 +67,6 @@ type MetricQueryMap struct {
 }
 
 func (q MetricQueryMap) Points() ([]*v2.MetricPoint, error) {
-	//baseLabel := q.GetBaseLabel()
 	points := []*v2.MetricPoint{}
 	metricTags := []*v2.MetricTag{}
 	for _, d := range q.Dimensions {
@@ -464,7 +463,6 @@ func buildGetMetricDataInput(metricDataQueries []types.MetricDataQuery, periodMi
 func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, periodMinutes int) (int, error) {
 	metricQueryMap := make(map[string]MetricQueryMap)
 	unusedQueryMap := make(map[string]MetricQueryMap)
-	//metricOutputStrings := map[string][]string{}
 	dataMessages := make([]types.MessageData, 0)
 	numResults := 0
 
@@ -510,17 +508,6 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 				if err == nil {
 					results = append(results, metricPoints...)
 				}
-				/*
-					metricName := q.MetricName
-					if len(metricOutputStrings[metricName]) == 0 {
-								output, err := q.Output(true, false, false)
-								if err != nil {
-									fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
-									return sensu.CheckStateCritical, nil
-								}
-								metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
-						}
-				*/
 
 			}
 		} else {
@@ -551,24 +538,6 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 					if err == nil {
 						results = append(results, metricPoints...)
 					}
-					/*
-						metricName := *q.Metric.MetricName
-							if len(metricOutputStrings[metricName]) == 0 {
-								output, err := q.Output(true, true, true)
-								if err != nil {
-									fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
-									return sensu.CheckStateCritical, nil
-								}
-								metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
-							} else {
-								output, err := q.Output(false, false, true)
-								if err != nil {
-									fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
-									return sensu.CheckStateCritical, nil
-								}
-								metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
-							}
-					*/
 				}
 			}
 		}
@@ -606,20 +575,6 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 		metric.Points(results).ToProm(writer)
 		writer.Flush()
 	}
-	/*
-		keys := make([]string, 0, len(metricOutputStrings))
-		for k := range metricOutputStrings {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			m := metricOutputStrings[k]
-			for _, s := range m {
-				fmt.Println(s)
-			}
-
-		}
-	*/
 	return sensu.CheckStateOK, nil
 
 }
