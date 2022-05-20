@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -68,7 +67,23 @@ type MetricQueryMap struct {
 }
 
 func (q MetricQueryMap) Points() ([]*v2.MetricPoint, error) {
-	return nil, nil
+	//baseLabel := q.GetBaseLabel()
+	points := []*v2.MetricPoint{}
+	metricTags := []*v2.MetricTag{}
+	for _, d := range q.Dimensions {
+		metricTags = append(metricTags, &v2.MetricTag{Name: *d.Name, Value: *d.Value})
+	}
+
+	for i := range q.MetricDataResult.Timestamps {
+
+		point := v2.MetricPoint{Name: q.Label,
+			Value:     q.MetricDataResult.Values[i],
+			Timestamp: q.MetricDataResult.Timestamps[i].UnixNano() / 1000000,
+			Tags:      metricTags,
+		}
+		points = append(points, &point)
+	}
+	return points, nil
 }
 
 func (q MetricQueryMap) Output(includeHelp bool, includeType bool, includeData bool) ([]string, error) {
@@ -449,7 +464,7 @@ func buildGetMetricDataInput(metricDataQueries []types.MetricDataQuery, periodMi
 func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, periodMinutes int) (int, error) {
 	metricQueryMap := make(map[string]MetricQueryMap)
 	unusedQueryMap := make(map[string]MetricQueryMap)
-	metricOutputStrings := map[string][]string{}
+	//metricOutputStrings := map[string][]string{}
 	dataMessages := make([]types.MessageData, 0)
 	numResults := 0
 
@@ -466,6 +481,7 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 		metricQueryMap[idString] = qMap
 		unusedQueryMap[idString] = qMap
 	}
+	var results []*v2.MetricPoint
 	//Prepare the GetMetricData loop
 	i := 0
 	for i < len(metricDataQueries) {
@@ -490,22 +506,21 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 					return sensu.CheckStateCritical, nil
 				}
 				delete(unusedQueryMap, *d.Id)
-				metricName := q.MetricName
-				if len(metricOutputStrings[metricName]) == 0 {
-					metricPoints, err := q.Points()
-					if len(metricPoints) > 0 {
-						writer := bufio.NewWriter(os.Stdout)
-						metric.Points(metricPoints).ToProm(writer)
-						writer.Flush()
-					}
-
-					output, err := q.Output(true, false, false)
-					if err != nil {
-						fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
-						return sensu.CheckStateCritical, nil
-					}
-					metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
+				metricPoints, err := q.Points()
+				if err == nil {
+					results = append(results, metricPoints...)
 				}
+				/*
+					metricName := q.MetricName
+					if len(metricOutputStrings[metricName]) == 0 {
+								output, err := q.Output(true, false, false)
+								if err != nil {
+									fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
+									return sensu.CheckStateCritical, nil
+								}
+								metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
+						}
+				*/
 
 			}
 		} else {
@@ -532,22 +547,28 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 				}
 				if len(d.Timestamps) > 0 {
 					delete(unusedQueryMap, *d.Id)
-					metricName := *q.Metric.MetricName
-					if len(metricOutputStrings[metricName]) == 0 {
-						output, err := q.Output(true, true, true)
-						if err != nil {
-							fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
-							return sensu.CheckStateCritical, nil
-						}
-						metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
-					} else {
-						output, err := q.Output(false, false, true)
-						if err != nil {
-							fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
-							return sensu.CheckStateCritical, nil
-						}
-						metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
+					metricPoints, err := q.Points()
+					if err == nil {
+						results = append(results, metricPoints...)
 					}
+					/*
+						metricName := *q.Metric.MetricName
+							if len(metricOutputStrings[metricName]) == 0 {
+								output, err := q.Output(true, true, true)
+								if err != nil {
+									fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
+									return sensu.CheckStateCritical, nil
+								}
+								metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
+							} else {
+								output, err := q.Output(false, false, true)
+								if err != nil {
+									fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
+									return sensu.CheckStateCritical, nil
+								}
+								metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
+							}
+					*/
 				}
 			}
 		}
@@ -580,19 +601,25 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 	if warnFlag {
 		return sensu.CheckStateWarning, nil
 	}
-	keys := make([]string, 0, len(metricOutputStrings))
-	for k := range metricOutputStrings {
-		keys = append(keys, k)
+	if len(results) > 0 {
+		writer := bufio.NewWriter(os.Stdout)
+		metric.Points(results).ToProm(writer)
+		writer.Flush()
 	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		m := metricOutputStrings[k]
-		for _, s := range m {
-			fmt.Println(s)
+	/*
+		keys := make([]string, 0, len(metricOutputStrings))
+		for k := range metricOutputStrings {
+			keys = append(keys, k)
 		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			m := metricOutputStrings[k]
+			for _, s := range m {
+				fmt.Println(s)
+			}
 
-	}
-
+		}
+	*/
 	return sensu.CheckStateOK, nil
 
 }
