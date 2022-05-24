@@ -572,7 +572,10 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 	}
 	if len(results) > 0 {
 		writer := bufio.NewWriter(os.Stdout)
-		metric.Points(results).ToProm(writer)
+		err := metric.Points(results).ToProm(writer)
+		if err != nil {
+			return sensu.CheckStateCritical, err
+		}
 		writer.Flush()
 	}
 	return sensu.CheckStateOK, nil
