@@ -1,10 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"os"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,9 +16,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	sensuAWS "github.com/sensu/sensu-cloudwatch-check/aws"
 	v2 "github.com/sensu/sensu-go/api/core/v2"
-	sensuAWS "github.com/sensu/sensu-plugin-sdk/aws"
 	"github.com/sensu/sensu-plugin-sdk/sensu"
+	"github.com/sensu/sensu-plugin-sdk/sensu/metric"
 )
 
 // Config represents the check plugin config.
@@ -54,6 +56,25 @@ type MetricQueryMap struct {
 	Dimensions       []types.Dimension
 	Metric           *types.Metric
 	MetricDataResult types.MetricDataResult
+}
+
+func (q MetricQueryMap) Points() ([]*v2.MetricPoint, error) {
+	points := []*v2.MetricPoint{}
+	metricTags := []*v2.MetricTag{}
+	for _, d := range q.Dimensions {
+		metricTags = append(metricTags, &v2.MetricTag{Name: *d.Name, Value: *d.Value})
+	}
+
+	for i := range q.MetricDataResult.Timestamps {
+
+		point := v2.MetricPoint{Name: q.Label,
+			Value:     q.MetricDataResult.Values[i],
+			Timestamp: q.MetricDataResult.Timestamps[i].UnixNano() / 1000000,
+			Tags:      metricTags,
+		}
+		points = append(points, &point)
+	}
+	return points, nil
 }
 
 func (q MetricQueryMap) Output(includeHelp bool, includeType bool, includeData bool) ([]string, error) {
@@ -97,15 +118,55 @@ var (
 		},
 	}
 	//initialize options list with custom options
-	options = []*sensu.PluginConfigOption{
-		{
+	options = []sensu.ConfigOption{
+		&sensu.PluginConfigOption[string]{
+			Path:      "region",
+			Env:       "AWS_REGION",
+			Argument:  "region",
+			Shorthand: "",
+			Default:   "",
+			Usage:     "AWS Region to use, (or set envvar AWS_REGION)",
+			Value:     &plugin.AWSRegion,
+		},
+		&sensu.PluginConfigOption[string]{
+			Path:      "profile",
+			Env:       "AWS_PROFILE",
+			Argument:  "profile",
+			Shorthand: "",
+			Default:   "",
+			Usage:     "AWS Credential Profile (for security use envvar AWS_PROFILE)",
+			Secret:    false,
+			Value:     &plugin.AWSProfile,
+		},
+		&sensu.SlicePluginConfigOption[string]{
+			Path:      "config-files",
+			Env:       "",
+			Argument:  "config-files",
+			Shorthand: "",
+			Default:   []string{},
+			Usage:     "comma separated list of AWS config files",
+			Secret:    false,
+			Value:     &plugin.AWSConfigFiles,
+		},
+		&sensu.SlicePluginConfigOption[string]{
+			Path:      "credentials-files",
+			Env:       "",
+			Argument:  "credentials-files",
+			Shorthand: "",
+			Default:   []string{},
+			Usage:     "comma separated list of AWS Credential files",
+			Secret:    false,
+			Value:     &plugin.AWSCredentialsFiles,
+		},
+		&sensu.PluginConfigOption[bool]{
 			Value:     &plugin.OutputConfig,
 			Path:      "output-config",
 			Argument:  "output-config",
 			Shorthand: "o",
 			Default:   false,
 			Usage:     "Output measurement configuration JSON string",
-		}, {
+		},
+		&sensu.PluginConfigOption[string]{
 			Path:      "config",
 			Argument:  "config",
 			Env:       "CLOUDWATCH_CHECK_CONFIG",
@@ -114,13 +175,14 @@ var (
 			Usage:     "The measurement configuration JSON string to use",
 			Value:     &plugin.ConfigString,
 		},
-		{
+		&sensu.PluginConfigOption[bool]{
 			Path:     "recently-active",
 			Argument: "recently-active",
 			Default:  false,
 			Usage:    "Only include metrics recently active in aprox last 3 hours",
 			Value:    &plugin.RecentlyActive,
-		}, {
+		},
+		&sensu.PluginConfigOption[string]{
 			Path:      "namespace",
 			Argument:  "namespace",
 			Env:       "CLOUDWATCH_CHECK_NAMESPACE",
@@ -128,7 +190,8 @@ var (
 			Default:   "",
 			Usage:     "Cloudwatch Metric Namespace",
 			Value:     &plugin.Namespace,
-		}, {
+		},
+		&sensu.SlicePluginConfigOption[string]{
 			Path:      "dimension-filters",
 			Argument:  "dimension-filters",
 			Env:       "CLOUDWATCH_CHECK_DIMENSION_FILTERS",
@@ -136,7 +199,8 @@ var (
 			Default:   []string{},
 			Usage:     `Comma separated list of AWS Cloudwatch Dimension Filters Ex: "Name, SecondName=SecondValue"`,
 			Value:     &plugin.DimensionFilterStrings,
-		}, {
+		},
+		&sensu.SlicePluginConfigOption[string]{
 			Path:      "stats",
 			Argument:  "stats",
 			Env:       "CLOUDWATCH_CHECK_STATS",
@@ -144,7 +208,8 @@ var (
 			Default:   []string{"Average", "Sum", "SampleCount", "Maximum", "Minimum"},
 			Usage:     `Comma separated list of AWS Cloudwatch Status Ex: "Average, Sum"`,
 			Value:     &plugin.StatsList,
-		}, {
+		},
+		&sensu.PluginConfigOption[string]{
 			Path:      "metric-filter",
 			Argument:  "metric-filter",
 			Env:       "CLOUDWATCH_CHECK_METRIC_FILTER",
@@ -152,7 +217,8 @@ var (
 			Default:   "",
 			Usage:     "Cloudwatch Metric Filter, limit result to given Metric name",
 			Value:     &plugin.MetricName,
-		}, {
+		},
+		&sensu.PluginConfigOption[string]{
 			Path:      "preset",
 			Argument:  "preset",
 			Env:       "CLOUDWATCH_CHECK_PRESET",
@@ -160,7 +226,8 @@ var (
 			Default:   "None",
 			Usage:     "The service preset to use",
 			Value:     &plugin.PresetName,
-		}, {
+		},
+		&sensu.PluginConfigOption[int]{
 			Path:      "max-pages",
 			Argument:  "max-pages",
 			Env:       "CLOUDWATCH_CHECK_MAX_PAGES",
@@ -168,7 +235,8 @@ var (
 			Default:   1,
 			Usage:     "Maximum number of result pages. A zero value will disable the limit",
 			Value:     &plugin.MaxPages,
-		}, {
+		},
+		&sensu.PluginConfigOption[int]{
 			Path:      "period-minutes",
 			Argument:  "period-minutes",
 			Env:       "CLOUDWATCH_CHECK_PERIOD_MINUTES",
@@ -176,14 +244,16 @@ var (
 			Default:   1,
 			Usage:     "Previous number of minutes to consider for metrics statistic calculation",
 			Value:     &plugin.PeriodMinutes,
-		}, {
+		},
+		&sensu.PluginConfigOption[bool]{
 			Path:      "verbose",
 			Argument:  "verbose",
 			Shorthand: "v",
 			Default:   false,
 			Usage:     "Enable verbose output",
 			Value:     &plugin.Verbose,
-		}, {
+		},
+		&sensu.PluginConfigOption[bool]{
 			Path:      "error-on-missing",
 			Argument:  "error-on-missing",
 			Shorthand: "",
@@ -191,7 +261,8 @@ var (
 			Env:       "CLOUDWATCH_CHECK_ERROR_ON_MISSING",
 			Usage:     "Error if requested metrics configuration is missing a known metric from the AWS service metric list",
 			Value:     &plugin.ErrorOnMissing,
-		}, {
+		},
+		&sensu.PluginConfigOption[bool]{
 			Path:      "dry-run",
 			Argument:  "dry-run",
 			Shorthand: "n",
@@ -203,8 +274,6 @@ var (
 )
 
 func init() {
-	//append common AWS options to option list
-	options = append(options, plugin.GetAWSOpts()...)
 }
 
 func main() {
@@ -386,7 +455,6 @@ func buildGetMetricDataInput(metricDataQueries []types.MetricDataQuery, periodMi
 func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, periodMinutes int) (int, error) {
 	metricQueryMap := make(map[string]MetricQueryMap)
 	unusedQueryMap := make(map[string]MetricQueryMap)
-	metricOutputStrings := map[string][]string{}
 	dataMessages := make([]types.MessageData, 0)
 	numResults := 0
 
@@ -403,6 +471,7 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 		metricQueryMap[idString] = qMap
 		unusedQueryMap[idString] = qMap
 	}
+	var results []*v2.MetricPoint
 	//Prepare the GetMetricData loop
 	i := 0
 	for i < len(metricDataQueries) {
@@ -427,14 +496,9 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 					return sensu.CheckStateCritical, nil
 				}
 				delete(unusedQueryMap, *d.Id)
-				metricName := q.MetricName
-				if len(metricOutputStrings[metricName]) == 0 {
-					output, err := q.Output(true, false, false)
-					if err != nil {
-						fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
-						return sensu.CheckStateCritical, nil
-					}
-					metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
+				metricPoints, err := q.Points()
+				if err == nil {
+					results = append(results, metricPoints...)
 				}
 
 			}
@@ -462,21 +526,9 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 				}
 				if len(d.Timestamps) > 0 {
 					delete(unusedQueryMap, *d.Id)
-					metricName := *q.Metric.MetricName
-					if len(metricOutputStrings[metricName]) == 0 {
-						output, err := q.Output(true, true, true)
-						if err != nil {
-							fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
-							return sensu.CheckStateCritical, nil
-						}
-						metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
-					} else {
-						output, err := q.Output(false, false, true)
-						if err != nil {
-							fmt.Printf("Error creating metric output for MetricQuery: %v\n", *d.Id)
-							return sensu.CheckStateCritical, nil
-						}
-						metricOutputStrings[metricName] = append(metricOutputStrings[metricName], output...)
+					metricPoints, err := q.Points()
+					if err == nil {
+						results = append(results, metricPoints...)
 					}
 				}
 			}
@@ -510,19 +562,14 @@ func getData(client ServiceAPI, metricDataQueries []types.MetricDataQuery, perio
 	if warnFlag {
 		return sensu.CheckStateWarning, nil
 	}
-	keys := make([]string, 0, len(metricOutputStrings))
-	for k := range metricOutputStrings {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		m := metricOutputStrings[k]
-		for _, s := range m {
-			fmt.Println(s)
+	if len(results) > 0 {
+		writer := bufio.NewWriter(os.Stdout)
+		err := metric.Points(results).ToProm(writer)
+		if err != nil {
+			return sensu.CheckStateCritical, err
 		}
-
+		writer.Flush()
 	}
-
 	return sensu.CheckStateOK, nil
 
 }
