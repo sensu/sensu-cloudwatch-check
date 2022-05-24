@@ -46,14 +46,6 @@ type Config struct {
 	Preset                 presets.PresetInterface
 	OutputConfig           bool
 	ConfigString           string
-	AWSRegion              string
-	AWSProfile             string
-	AWSCredentialsFiles    []string
-	AWSConfigFiles         []string
-	AWSAccessKeyID         string
-	AWSSecretAccessKey     string
-	AWSConfig              *aws.Config
-	AWSCredentials         *aws.Credentials
 }
 
 type MetricQueryMap struct {
@@ -406,9 +398,9 @@ func checkArgs(_ *v2.Event) (int, error) {
 
 func executeCheck(_ *v2.Event) (int, error) {
 	//Make sure plugin.CheckAwsCreds() worked as expected
-	//if plugin.AWSConfig == nil {
-	//	return sensu.CheckStateCritical, fmt.Errorf("AWS Config undefined, something went wrong in processing AWS configuration information")
-	//}
+	if plugin.AWSConfig == nil {
+		return sensu.CheckStateCritical, fmt.Errorf("AWS Config undefined, something went wrong in processing AWS configuration information")
+	}
 	//Start AWS Service specific client
 	client := cloudwatch.NewFromConfig(*plugin.AWSConfig)
 	//Run business logic for check

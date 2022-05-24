@@ -43,7 +43,6 @@ func (plugin *AWSPluginConfig) CheckAWSCreds() (int, error) {
 			return sensu.CheckStateCritical, fmt.Errorf("Config file missing: %s", f)
 		}
 	}
-
 	// Note: slight workaround here as sdk wont let me pass an array of arguments
 	// due to a type mismatch
 	// workaround for now is to pass the same function pointer multiple times in some cases

@@ -6,6 +6,10 @@ and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Changed
+- Update to sensu-plugin-sdk v0.16
+### Fixed
+- Fixed Prometheus output formatting
 
 ## [0.2.0] - 2022-04-20
 
