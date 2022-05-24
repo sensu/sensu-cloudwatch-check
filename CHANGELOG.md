@@ -6,6 +6,8 @@ and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## [0.3.0] - 2022-05-24
 ### Changed
 - Update to sensu-plugin-sdk v0.16
 ### Fixed
