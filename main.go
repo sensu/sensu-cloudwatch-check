@@ -305,7 +305,7 @@ func checkArgs(_ *v2.Event) (int, error) {
 				str := fmt.Sprintf(" %v : %v\n", key.String(), presets.Presets[key.String()].GetDescription())
 				strArr = append(strArr, str)
 			}
-			err := fmt.Errorf("Preset %v not defined\nChoose from:\n%v", plugin.PresetName, strings.Join(strArr, ""))
+			err := fmt.Errorf("preset %v not defined\nChoose from:\n%v", plugin.PresetName, strings.Join(strArr, ""))
 			return sensu.CheckStateWarning, err
 		}
 	} else {

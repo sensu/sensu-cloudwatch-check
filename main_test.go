@@ -38,11 +38,11 @@ func (m mockService) ListMetrics(ctx context.Context,
 	namespace := "AWS/test"
 	// Create a list of two dummy metrics
 	metrics := []types.Metric{
-		types.Metric{
+		{
 			MetricName: &name,
 			Namespace:  &namespace,
 			Dimensions: []types.Dimension{
-				types.Dimension{
+				{
 					Name:  aws.String("test_name"),
 					Value: aws.String("test_value"),
 				},
@@ -83,11 +83,11 @@ func (m mockService) GetMetricData(ctx context.Context,
 	}
 	if m.includeMessages {
 		output.Messages = []types.MessageData{
-			types.MessageData{
+			{
 				Code:  aws.String("400"),
 				Value: aws.String("test message"),
 			},
-			types.MessageData{
+			{
 				Code:  aws.String("400"),
 				Value: aws.String("test message"),
 			},
@@ -201,7 +201,7 @@ func TestGetMetricData(t *testing.T) {
 			id := "test"
 			input = &cloudwatch.GetMetricDataInput{
 				MetricDataQueries: []types.MetricDataQuery{
-					types.MetricDataQuery{
+					{
 						Id: &id,
 					},
 				},
